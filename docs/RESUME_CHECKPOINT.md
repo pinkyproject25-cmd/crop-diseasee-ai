@@ -124,4 +124,6 @@ invent a crop or disease prediction, which remains the intended behavior.
   `1fb6e3b923fe9d80e073dc5c100dd2bc2634775e`.
 - Reviewed PlantDoc manifest finalization:
   `85d2a36b241ebe377185d381ed4b6c76bd784062`.
+- Fixed Candidate-v2 mixed-domain trainer:
+  `3979260d98e9de44f55a6f3a36855f70d2f1e697`.
 - Detailed progress: `docs/PARALLEL_PROGRESS.md`.
