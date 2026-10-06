@@ -32,6 +32,12 @@ Updated: 2026-10-06 (Asia/Kolkata)
   from `torch.inference_mode()` to `torch.no_grad()`. This preserves
   gradient-free model evaluation while allowing LBFGS to optimize the
   temperature parameter against the collected logits.
+- Ran the fixed candidate once on all 236 images in the official pinned
+  PlantDoc test split and preserved the complete evidence under the isolated
+  Drive directory `field_evaluation_plantdoc_v1`.
+- Reviewed all 11 field errors that passed the `0.99` threshold. Two corn
+  examples warrant independent label review, but even crediting both to the
+  model cannot change the failed gate decision.
 
 ## Verification
 
@@ -74,6 +80,11 @@ Updated: 2026-10-06 (Asia/Kolkata)
 - Predefined the field gate before viewing results: at least 30% coverage, 95%
   accepted accuracy, and a 90% lower bound for its 95% Wilson interval. The OOD
   gate requires at least 500 documented images and at most 1% false acceptance.
+- PlantDoc field evaluation: 236/236 images decoded; top-1 accuracy before
+  rejection was `25.42%` and macro-F1 was `24.61%`.
+- At the fixed `0.99` threshold, 23 images were accepted (coverage `9.75%`),
+  12 were correct (accepted accuracy `52.17%`), and the accepted-accuracy 95%
+  Wilson lower bound was `32.96%`. The predefined field gate failed.
 
 ## Deployment state
 
@@ -84,16 +95,22 @@ Updated: 2026-10-06 (Asia/Kolkata)
 
 ## Known problems and scientific blockers
 
-- High controlled-dataset performance is not production approval. Field-image
-  and realistic unsupported-image evaluation remains pending.
+- High controlled-dataset performance did not transfer to the independent
+  field set. Candidate v1 failed the PlantDoc field gate and is rejected for
+  backend integration in its current form.
 - The 36 independent-test errors are concentrated in visually similar tomato
   diseases. The largest pairs are tomato late blight to early blight (5) and
   tomato spider mites to target spot (5).
 - Potato healthy has only 16 independent-test examples and the lowest per-class
   F1 (`0.9375`), so its controlled-set estimate has high sampling uncertainty.
 - CIFAR-100 is only a provisional non-leaf OOD sanity check.
-- PlantDoc or another licensed field-image evaluation set must be mapped and evaluated independently.
-- The rejection threshold cannot be approved until realistic unsupported and field inputs are measured.
+- The `0.99` confidence threshold is not field-calibrated: 11 of 23 accepted
+  PlantDoc predictions were wrong under the published labels.
+- PlantDoc test has now been consumed for candidate-v1 evaluation and must not
+  be used for threshold tuning. A different untouched field set is required
+  for a future approval decision.
+- Realistic unsupported/non-leaf evaluation remains pending, but it cannot
+  rescue candidate v1's failed field gate.
 - Severity/visible affected-area estimation lacks a validated segmentation dataset/model.
 - Disease symptoms, causes, and recommendations lack a complete cited agricultural review.
 - English/Telugu/Hindi translation and actual cloud speech have not been validated end to end.
@@ -102,12 +119,15 @@ Updated: 2026-10-06 (Asia/Kolkata)
 
 ## Next actions
 
-1. Run the pinned official PlantDoc test split with `evaluate_candidate.py` and
-   review all high-confidence errors before defining a pass/fail decision.
-2. Assemble a source-documented realistic unsupported/non-leaf suite and measure threshold coverage,
-   accepted accuracy, false acceptance, and failure examples.
-3. Keep the candidate out of the backend until those gates pass; then review
-   whether the threshold should remain `0.99` before any production approval.
+1. Design candidate v2 around field-domain generalization. Audit and deduplicate
+   PlantDoc train data, use it only as training/development evidence, and keep
+   a different licensed field dataset untouched for final evaluation.
+2. Refit calibration and rejection using only candidate-v2 calibration data;
+   do not tune against the consumed PlantDoc test results.
+3. Assemble a source-documented realistic unsupported/non-leaf suite and
+   measure false acceptance under the separately predefined OOD gate.
+4. Keep every candidate out of the backend until both independent field and
+   realistic OOD gates pass.
 
 ## Relevant commit
 

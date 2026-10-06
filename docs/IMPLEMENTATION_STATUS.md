@@ -19,12 +19,17 @@
 - Frontend TypeScript checking and the Vite production build pass locally.
 - Backend smoke checks pass for health, unsupported media, and deliberate missing-model refusal.
 - The training pipeline creates fresh leaf-group-independent train/validation/calibration/test partitions, writes resumable checkpoints, exports per-class/confusion-matrix evidence, and verifies ONNX parity.
+- Candidate v1 completed controlled evaluation but failed the predefined
+  independent PlantDoc field gate (`9.75%` coverage and `52.17%` accepted
+  accuracy at threshold `0.99`). It is not approved or installed.
 
 ## Scientific gates before the application can claim real production analysis
 
-- Train and export the crop classifier.
-- Measure class-wise performance on a leaf-group-independent split.
-- Evaluate field photographs and unsupported/out-of-distribution images.
+- Train and export a revised classifier with adequate field-domain evidence.
+- Reconfirm class-wise performance on leakage-independent controlled and field
+  splits; PlantDoc test is now a consumed benchmark, not a tuning set.
+- Pass a different untouched field-photo gate and a source-documented
+  unsupported/out-of-distribution gate.
 - Calibrate the acceptance threshold using the dedicated calibration split and confirm selective performance on the independent test set.
 - Obtain segmentation/severity annotations and validate visible affected-area measurement.
 - Add reviewed, cited disease information for every production-supported class.

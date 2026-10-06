@@ -42,10 +42,20 @@ Never use the original project's repository, Colab notebook, Vercel project, Ren
 - Field pass criteria were fixed before execution (30% coverage, 95% accepted
   accuracy, 90% Wilson lower bound); the realistic OOD gate requires at least
   500 documented images and no more than 1% false acceptance.
+- Evaluated candidate `plantvillage-mnv3-20261006T022813Z` on all 236 images in
+  the pinned official PlantDoc test split. Top-1 accuracy was `25.42%` and
+  macro-F1 was `24.61%` before rejection.
+- Candidate v1 failed the predefined field gate: `9.75%` coverage, `52.17%`
+  accepted accuracy (12/23), and `32.96%` accepted-accuracy Wilson lower bound.
+  All 11 accepted errors were manually reviewed; two possible source-label
+  anomalies do not alter the failure decision.
 
 ## Current parallel behavior
 
-The parallel application is not deployed. No diagnostic model has been approved or installed. The local API deliberately refuses to invent a crop or disease prediction, which is the intended safe behavior until the model passes the required tests.
+The parallel application is not deployed. Candidate v1 is explicitly rejected
+for backend integration after failing the independent field gate. No diagnostic
+model has been approved or installed. The local API deliberately refuses to
+invent a crop or disease prediction, which remains the intended behavior.
 
 ## Parallel Colab state
 
@@ -62,13 +72,17 @@ The parallel application is not deployed. No diagnostic model has been approved 
 
 ## Remaining work
 
-1. Run and review the pinned official PlantDoc test evaluation, then evaluate a source-documented realistic unsupported/non-leaf suite.
-2. Review the 36 controlled-test errors, especially visually similar tomato diseases, and gather more evidence for low-support classes such as potato healthy.
-3. Keep `production_approved` false until all gates pass; do not install a candidate merely because controlled PlantVillage metrics are high.
-4. Implement and validate disease-area/severity estimation.
-5. Complete and agriculturally review the symptoms, causes, and recommendations knowledge base.
-6. Complete working English, Telugu, and Hindi translation and speech.
-7. Create isolated Vercel and Render resources only after the scientific candidate is reviewed; install only an approved model and run full end-to-end verification.
+1. Build a candidate-v2 plan focused on field-domain generalization: audit and
+   deduplicate PlantDoc train, add field-domain training, and reserve a
+   different licensed field set for untouched final evaluation.
+2. Recalibrate candidate v2 without tuning on the now-consumed PlantDoc test
+   split, then evaluate a source-documented realistic unsupported/non-leaf suite.
+3. Keep `production_approved` false and do not install candidate v1.
+4. Review the 36 controlled-test errors, especially visually similar tomato diseases, and gather more evidence for low-support classes such as potato healthy.
+5. Implement and validate disease-area/severity estimation.
+6. Complete and agriculturally review the symptoms, causes, and recommendations knowledge base.
+7. Complete working English, Telugu, and Hindi translation and speech.
+8. Create isolated Vercel and Render resources only after a scientific candidate is approved; install only an approved model and run full end-to-end verification.
 
 ## Integrity rules
 

@@ -51,6 +51,53 @@ least 95% accepted accuracy, and a 95% Wilson lower confidence bound of at least
 90% for accepted accuracy. Passing this gate still does not grant production
 approval.
 
+## Candidate v1 result (2026-10-06)
+
+Candidate `plantvillage-mnv3-20261006T022813Z` was evaluated once against the
+pinned official PlantDoc test split with the unchanged `0.99` threshold.
+
+| Measure | Result | Predefined requirement |
+| --- | ---: | ---: |
+| Evaluated images | 236 | n/a |
+| Top-1 accuracy before rejection | 25.42% | Diagnostic only |
+| Macro-F1 before rejection | 24.61% | Diagnostic only |
+| Accepted images | 23 | n/a |
+| Coverage | 9.75% | at least 30% |
+| Accepted accuracy | 52.17% (12/23) | at least 95% |
+| Accepted-accuracy 95% Wilson lower bound | 32.96% | at least 90% |
+| Quality rejections | 14 | n/a |
+| Confidence rejections after quality | 199 | n/a |
+
+The predefined field gate **failed**. The candidate must not be installed in
+the backend or marked production-approved. Confidence learned from the
+controlled PlantVillage domain did not transfer reliably to field images: 11
+of the 23 predictions accepted at `0.99` were wrong under the published
+PlantDoc directory labels.
+
+All 11 accepted errors were visually reviewed against the source images. Two
+files placed in `Corn leaf blight` (`2013Corn_GrayLeafSpot_0815_0003.JPG.jpg`
+and `corn-gray-leaf-spot-f4.jpg`) have filenames and visible lesions that
+warrant independent ground-truth review because the model predicted gray leaf
+spot. They were not silently relabeled. Even treating both as correct would
+produce only 60.87% accepted accuracy (14/23), so label uncertainty cannot
+change the failed gate decision.
+
+The generated evidence remains in the isolated Drive directory
+`MyDrive/CropDiseaseAIParallel/field_evaluation_plantdoc_v1`. Review-copy
+SHA-256 values:
+
+- `field_metrics.json`: `af0f72f17611b6dd5c430d12b167c66fa00cdb9faa965a1a7df351db7077a81d`
+- `field_per_class_metrics.csv`: `a37b15a15869af426a0d4ed955e833be90f8189b7c6025923e8e1419c18b0895`
+- `field_top_confident_errors.csv`: `6da02492d6f7d6bd6d88fdfdb2d3a1da238e44f8f8e218c996a12676888b49a4`
+- `field_predictions.csv`: `7c015dba1d2f2dc67d94013338cde9915717d44f168f5678ac768e2b4a15322c`
+- `field_confusion_matrix.png`: `7c1825d7a4f8a4028b9f931800a7b85b0be7fc317667a3caddd9634f9a5918ac`
+
+PlantDoc's test split is now a consumed evaluation set for this development
+line. It may continue to be reported as a fixed benchmark, but it must not be
+used to tune thresholds or make image-by-image training decisions. A revised
+candidate needs field-domain training data plus a different untouched field
+set for its final approval gate.
+
 ## Realistic unsupported-image run
 
 Place a separately sourced, license-compatible suite under a Drive directory.
