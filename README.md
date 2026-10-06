@@ -2,6 +2,8 @@
 
 Crop Disease AI is a responsive crop-leaf screening application for 14 target crops. It accepts an uploaded or captured image, sends the decoded image to a specialist inference API, and presents one of three explicit states: healthy, diseased, or unknown.
 
+This repository is the isolated parallel instance owned by `pinkyproject25-cmd`. It must not be connected to, deployed over, or synchronized with `Ashish7386/crop-disease-ai` or that project's Vercel, Render, or Colab resources.
+
 ## Current implementation status
 
 The responsive seven-page frontend and production API contract are implemented. The API refuses to generate a prediction until validated ONNX model artifacts are installed. This is intentional: filename rules, randomized results, generic ImageNet weights, and placeholder scores are prohibited.
@@ -58,7 +60,11 @@ GET /health
 - Translation and speech: Azure Translator and Azure AI Speech, using server-side credentials.
 - History: browser `localStorage`; no account or database.
 
-The deployed API is intentionally not prediction-ready until reviewed model and label artifacts are installed. The production frontend is connected to this API and surfaces that unavailable state instead of inventing a result.
+This parallel instance is not deployed yet. Any future frontend and API must use newly created Vercel and Render resources dedicated to this repository. Until an independently reviewed model is approved and installed, the API remains intentionally not prediction-ready and returns a technical-unavailable response instead of inventing a result.
+
+For a new hosted GPU run, open the repository notebook in a fresh Colab runtime. It stores resumable candidate checkpoints under `MyDrive/CropDiseaseAIParallel` and keeps `production_approved` false:
+
+https://colab.research.google.com/github/pinkyproject25-cmd/crop-diseasee-ai/blob/main/notebooks/train_classifier_colab.ipynb
 
 ## Privacy
 

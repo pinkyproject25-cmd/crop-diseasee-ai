@@ -8,6 +8,8 @@ in docs/IMPLEMENTATION_STATUS.md are complete.
 from __future__ import annotations
 
 import argparse
+import csv
+import hashlib
 import json
 import math
 import random
@@ -18,9 +20,12 @@ from pathlib import Path
 from typing import Iterable
 
 import numpy as np
+import onnxruntime as ort
 import torch
+import torchvision
 from datasets import Dataset, DatasetDict, load_dataset
-from huggingface_hub import hf_hub_download
+from huggingface_hub import HfApi, hf_hub_download
+from matplotlib import pyplot as plt
 from PIL import Image
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, f1_score
 from sklearn.model_selection import StratifiedGroupKFold
@@ -46,7 +51,9 @@ class TrainConfig:
     num_workers: int = 2
     seed: int = 7386
     val_fold: int = 0
+    calibration_fold: int = 1
     ood_limit: int = 10_000
+    resume: bool = True
 
 
 class LeafDataset(TorchDataset[tuple[Tensor, int]]):
@@ -87,7 +94,9 @@ def parse_args() -> TrainConfig:
     parser.add_argument("--num-workers", type=int, default=2)
     parser.add_argument("--seed", type=int, default=7386)
     parser.add_argument("--val-fold", type=int, default=0)
+    parser.add_argument("--calibration-fold", type=int, default=1)
     parser.add_argument("--ood-limit", type=int, default=10_000)
+    parser.add_argument("--no-resume", action="store_false", dest="resume")
     return TrainConfig(**vars(parser.parse_args()))
 
 
@@ -123,18 +132,42 @@ def image_transforms() -> tuple[transforms.Compose, transforms.Compose]:
     return train_transform, eval_transform
 
 
-def group_split(source: Dataset, seed: int, fold: int) -> tuple[np.ndarray, np.ndarray]:
+def group_split(
+    source: Dataset,
+    seed: int,
+    validation_fold: int,
+    calibration_fold: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     labels = np.asarray(source["label"], dtype=np.int64)
     groups = np.asarray(source["leaf_id"], dtype=str)
     if np.any(groups == "unknown"):
         raise RuntimeError("PlantVillage rows without leaf_id cannot be used for leakage-safe splitting.")
     splitter = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=seed)
     splits = list(splitter.split(np.zeros(labels.shape[0]), labels, groups))
-    train_indices, validation_indices = splits[fold % len(splits)]
-    overlap = set(groups[train_indices]).intersection(groups[validation_indices])
+    validation_fold %= len(splits)
+    calibration_fold %= len(splits)
+    if validation_fold == calibration_fold:
+        raise RuntimeError("Validation and calibration folds must be different.")
+
+    validation_indices = splits[validation_fold][1]
+    calibration_indices = splits[calibration_fold][1]
+    held_out = np.concatenate([validation_indices, calibration_indices])
+    train_indices = np.setdiff1d(np.arange(labels.shape[0]), held_out, assume_unique=False)
+
+    index_sets = [set(groups[indices]) for indices in (train_indices, validation_indices, calibration_indices)]
+    if index_sets[0] & index_sets[1] or index_sets[0] & index_sets[2] or index_sets[1] & index_sets[2]:
+        raise RuntimeError("Leaf-group leakage detected across training, validation, and calibration splits.")
+    return train_indices, validation_indices, calibration_indices
+
+
+def assert_independent_test_split(source_train: Dataset, source_test: Dataset) -> None:
+    train_groups = set(map(str, source_train["leaf_id"]))
+    test_groups = set(map(str, source_test["leaf_id"]))
+    if "unknown" in train_groups or "unknown" in test_groups:
+        raise RuntimeError("PlantVillage rows without leaf_id cannot be used for independent evaluation.")
+    overlap = train_groups.intersection(test_groups)
     if overlap:
-        raise RuntimeError(f"Leaf-group leakage detected for {len(overlap)} groups.")
-    return train_indices, validation_indices
+        raise RuntimeError(f"Train/test leaf-group leakage detected for {len(overlap)} groups.")
 
 
 def build_model(class_count: int) -> nn.Module:
@@ -301,6 +334,124 @@ def evaluate_split(logits: Tensor, labels: Tensor, class_names: list[str], tempe
     }
 
 
+def calibration_metrics(logits: Tensor, labels: Tensor, temperature: float) -> dict[str, float]:
+    targets = labels.numpy()
+    raw_probabilities = torch.softmax(logits, dim=1).numpy()
+    calibrated_probabilities = torch.softmax(logits / temperature, dim=1).numpy()
+    raw_nll = float(nn.functional.cross_entropy(logits, labels))
+    calibrated_nll = float(nn.functional.cross_entropy(logits / temperature, labels))
+    return {
+        "temperature": temperature,
+        "raw_nll": raw_nll,
+        "calibrated_nll": calibrated_nll,
+        "raw_ece": expected_calibration_error(raw_probabilities, targets),
+        "calibrated_ece": expected_calibration_error(calibrated_probabilities, targets),
+    }
+
+
+def selective_metrics(probabilities: np.ndarray, labels: np.ndarray, threshold: float) -> dict[str, float | int]:
+    confidence = probabilities.max(axis=1)
+    predictions = probabilities.argmax(axis=1)
+    accepted = confidence >= threshold
+    accepted_count = int(accepted.sum())
+    return {
+        "threshold": threshold,
+        "coverage": float(accepted.mean()),
+        "accepted_count": accepted_count,
+        "rejected_count": int((~accepted).sum()),
+        "accepted_accuracy": float((predictions[accepted] == labels[accepted]).mean()) if accepted_count else 0.0,
+    }
+
+
+def save_confusion_matrix(
+    matrix: list[list[int]],
+    class_names: list[str],
+    csv_path: Path,
+    image_path: Path,
+) -> None:
+    values = np.asarray(matrix, dtype=np.int64)
+    with csv_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(["actual\\predicted", *class_names])
+        for class_name, row in zip(class_names, values):
+            writer.writerow([class_name, *row.tolist()])
+
+    row_totals = values.sum(axis=1, keepdims=True)
+    normalized = np.divide(values, row_totals, out=np.zeros_like(values, dtype=np.float64), where=row_totals != 0)
+    figure, axis = plt.subplots(figsize=(18, 16))
+    rendered = axis.imshow(normalized, interpolation="nearest", cmap="Blues", vmin=0, vmax=1)
+    figure.colorbar(rendered, ax=axis, fraction=0.03, pad=0.02, label="Fraction of actual class")
+    axis.set(
+        title="PlantVillage independent test confusion matrix (row-normalized)",
+        xlabel="Predicted class",
+        ylabel="Actual class",
+        xticks=np.arange(len(class_names)),
+        yticks=np.arange(len(class_names)),
+        xticklabels=class_names,
+        yticklabels=class_names,
+    )
+    plt.setp(axis.get_xticklabels(), rotation=90, ha="center", fontsize=7)
+    plt.setp(axis.get_yticklabels(), fontsize=7)
+    figure.tight_layout()
+    figure.savefig(image_path, dpi=180)
+    plt.close(figure)
+
+
+def save_per_class_metrics(per_class: dict[str, object], class_names: list[str], path: Path) -> None:
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=["class", "precision", "recall", "f1-score", "support"])
+        writer.writeheader()
+        for class_name in class_names:
+            row = per_class[class_name]
+            if not isinstance(row, dict):
+                raise RuntimeError(f"Missing per-class metrics for {class_name}.")
+            writer.writerow({"class": class_name, **{key: row[key] for key in writer.fieldnames[1:]}})
+
+
+def save_training_history(history: list[dict[str, float | int]], path: Path) -> None:
+    if not history:
+        return
+    epochs = [int(row["epoch"]) for row in history]
+    figure, axes = plt.subplots(1, 2, figsize=(12, 4.5))
+    axes[0].plot(epochs, [float(row["train_loss"]) for row in history], marker="o")
+    axes[0].set(title="Training loss", xlabel="Epoch", ylabel="Weighted cross-entropy")
+    axes[1].plot(epochs, [float(row["validation_accuracy"]) for row in history], marker="o", label="Accuracy")
+    axes[1].plot(epochs, [float(row["validation_macro_f1"]) for row in history], marker="o", label="Macro-F1")
+    axes[1].set(title="Model-selection validation", xlabel="Epoch", ylabel="Score", ylim=(0, 1))
+    axes[1].legend()
+    figure.tight_layout()
+    figure.savefig(path, dpi=180)
+    plt.close(figure)
+
+
+def verify_onnx_export(model: nn.Module, images: Tensor, path: Path, device: torch.device) -> dict[str, float | int]:
+    model.eval()
+    with torch.inference_mode():
+        torch_logits = model(images.to(device)).cpu().numpy()
+    session = ort.InferenceSession(str(path), providers=["CPUExecutionProvider"])
+    input_name = session.get_inputs()[0].name
+    onnx_logits = np.asarray(session.run(None, {input_name: images.cpu().numpy()})[0])
+    max_absolute_error = float(np.max(np.abs(torch_logits - onnx_logits)))
+    agreement = int((torch_logits.argmax(axis=1) == onnx_logits.argmax(axis=1)).sum())
+    if agreement != images.shape[0] or max_absolute_error > 1e-4:
+        raise RuntimeError(
+            f"ONNX parity check failed: {agreement}/{images.shape[0]} classes agree, max error {max_absolute_error}."
+        )
+    return {
+        "examples": int(images.shape[0]),
+        "top1_agreement": agreement,
+        "max_absolute_logit_error": max_absolute_error,
+    }
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
@@ -316,31 +467,43 @@ def main() -> None:
     # Datasets 4.x no longer executes Hub dataset scripts, and the repository's
     # mixed-case name prevents automatic discovery of plant_village.py. Fetch
     # the reviewed loader explicitly so image, label, and leaf_id are preserved.
+    dataset_info = HfApi().dataset_info("mohanty/PlantVillage")
+    dataset_revision = dataset_info.sha
     loader_path = hf_hub_download(
         repo_id="mohanty/PlantVillage",
         filename="plant_village.py",
         repo_type="dataset",
+        revision=dataset_revision,
     )
     data: DatasetDict = load_dataset(loader_path, "default", trust_remote_code=True)
     source_train = data["train"]
     source_test = data["test"]
+    assert_independent_test_split(source_train, source_test)
     label_feature = source_train.features["label"]
     class_names = list(label_feature.names)
     if len(class_names) != 38:
         raise RuntimeError(f"Expected 38 PlantVillage classes; received {len(class_names)}.")
 
-    train_indices, validation_indices = group_split(source_train, config.seed, config.val_fold)
+    train_indices, validation_indices, calibration_indices = group_split(
+        source_train,
+        config.seed,
+        config.val_fold,
+        config.calibration_fold,
+    )
     train_transform, eval_transform = image_transforms()
     train_dataset = LeafDataset(source_train, train_indices, train_transform)
     validation_dataset = LeafDataset(source_train, validation_indices, eval_transform)
+    calibration_dataset = LeafDataset(source_train, calibration_indices, eval_transform)
     test_dataset = LeafDataset(source_test, range(len(source_test)), eval_transform)
     loader_options = {
         "batch_size": config.batch_size,
         "num_workers": config.num_workers,
         "pin_memory": device.type == "cuda",
     }
-    train_loader = DataLoader(train_dataset, shuffle=True, **loader_options)
+    train_generator = torch.Generator().manual_seed(config.seed)
+    train_loader = DataLoader(train_dataset, shuffle=True, generator=train_generator, **loader_options)
     validation_loader = DataLoader(validation_dataset, shuffle=False, **loader_options)
+    calibration_loader = DataLoader(calibration_dataset, shuffle=False, **loader_options)
     test_loader = DataLoader(test_dataset, shuffle=False, **loader_options)
 
     model = build_model(len(class_names)).to(device)
@@ -352,11 +515,49 @@ def main() -> None:
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(1, config.epochs))
     best_macro_f1 = -math.inf
     best_path = output_dir / "best_model.pt"
+    checkpoint_path = output_dir / "last_checkpoint.pt"
     history: list[dict[str, float | int]] = []
+    start_epoch = 0
+    features_unfrozen = False
 
-    for epoch in range(config.epochs):
-        if epoch == config.warmup_epochs:
+    if config.resume and checkpoint_path.exists():
+        checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        checkpoint_config = checkpoint.get("config", {})
+        immutable_keys = ("epochs", "warmup_epochs", "batch_size", "learning_rate", "weight_decay", "seed", "val_fold", "calibration_fold")
+        mismatches = [key for key in immutable_keys if checkpoint_config.get(key) != getattr(config, key)]
+        if mismatches:
+            raise RuntimeError(f"Resume checkpoint configuration differs for: {', '.join(mismatches)}. Use a new output directory or --no-resume.")
+        features_unfrozen = bool(checkpoint["features_unfrozen"])
+        set_feature_training(model, features_unfrozen)
+        model.load_state_dict(checkpoint["model_state"])
+        phase_learning_rate = config.learning_rate / 3 if features_unfrozen else config.learning_rate
+        optimizer = torch.optim.AdamW(
+            model.parameters() if features_unfrozen else filter(lambda parameter: parameter.requires_grad, model.parameters()),
+            lr=phase_learning_rate,
+            weight_decay=config.weight_decay,
+        )
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=max(1, config.epochs - config.warmup_epochs) if features_unfrozen else max(1, config.epochs),
+        )
+        optimizer.load_state_dict(checkpoint["optimizer_state"])
+        scheduler.load_state_dict(checkpoint["scheduler_state"])
+        scaler.load_state_dict(checkpoint["scaler_state"])
+        history = checkpoint["history"]
+        best_macro_f1 = float(checkpoint["best_macro_f1"])
+        start_epoch = int(checkpoint["completed_epoch"])
+        random.setstate(checkpoint["python_random_state"])
+        np.random.set_state(checkpoint["numpy_random_state"])
+        torch.set_rng_state(checkpoint["torch_random_state"])
+        if torch.cuda.is_available() and checkpoint.get("cuda_random_state") is not None:
+            torch.cuda.set_rng_state_all(checkpoint["cuda_random_state"])
+        train_generator.set_state(checkpoint["train_generator_state"])
+        print(f"Resuming after epoch {start_epoch} from {checkpoint_path}")
+
+    for epoch in range(start_epoch, config.epochs):
+        if epoch == config.warmup_epochs and not features_unfrozen:
             set_feature_training(model, True)
+            features_unfrozen = True
             optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate / 3, weight_decay=config.weight_decay)
             scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(1, config.epochs - epoch))
         loss = train_epoch(model, train_loader, optimizer, criterion, device, scaler)
@@ -370,20 +571,54 @@ def main() -> None:
             best_macro_f1 = macro_f1
             torch.save(model.state_dict(), best_path)
         scheduler.step()
+        torch.save(
+            {
+                "completed_epoch": epoch + 1,
+                "features_unfrozen": features_unfrozen,
+                "model_state": model.state_dict(),
+                "optimizer_state": optimizer.state_dict(),
+                "scheduler_state": scheduler.state_dict(),
+                "scaler_state": scaler.state_dict(),
+                "history": history,
+                "best_macro_f1": best_macro_f1,
+                "config": asdict(config),
+                "python_random_state": random.getstate(),
+                "numpy_random_state": np.random.get_state(),
+                "torch_random_state": torch.get_rng_state(),
+                "cuda_random_state": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
+                "train_generator_state": train_generator.get_state(),
+            },
+            checkpoint_path,
+        )
 
+    if not best_path.exists():
+        raise RuntimeError("No best-model checkpoint exists; training did not complete a validation epoch.")
     model.load_state_dict(torch.load(best_path, map_location=device, weights_only=True))
     validation_logits, validation_labels = collect_logits(model, validation_loader, device)
-    temperature = fit_temperature(validation_logits, validation_labels)
+    calibration_logits, calibration_labels = collect_logits(model, calibration_loader, device)
+    temperature = fit_temperature(calibration_logits, calibration_labels)
     test_logits, test_labels = collect_logits(model, test_loader, device)
     validation_metrics = evaluate_split(validation_logits, validation_labels, class_names, temperature)
+    calibration_split_metrics = evaluate_split(calibration_logits, calibration_labels, class_names, temperature)
     test_metrics = evaluate_split(test_logits, test_labels, class_names, temperature)
     calibrated = CalibratedModel(model, temperature).to(device).eval()
     ood_confidence = ood_confidences(calibrated, eval_transform, device, config.batch_size, config.num_workers, config.ood_limit)
     threshold = choose_provisional_threshold(
-        validation_metrics.pop("probabilities"),
-        validation_metrics.pop("targets"),
+        calibration_split_metrics["probabilities"],
+        calibration_split_metrics["targets"],
         ood_confidence,
     )
+    threshold_value = float(threshold["threshold"])
+    independent_test_selective = selective_metrics(
+        test_metrics["probabilities"],
+        test_metrics["targets"],
+        threshold_value,
+    )
+    calibration_evidence = calibration_metrics(calibration_logits, calibration_labels, temperature)
+    validation_metrics.pop("probabilities")
+    validation_metrics.pop("targets")
+    calibration_split_metrics.pop("probabilities")
+    calibration_split_metrics.pop("targets")
     test_metrics.pop("probabilities")
     test_metrics.pop("targets")
 
@@ -399,35 +634,82 @@ def main() -> None:
             "Disease information and recommendations have not completed agricultural review.",
         ],
         "config": asdict(config),
+        "software": {
+            "torch": torch.__version__,
+            "torchvision": torchvision.__version__,
+            "onnxruntime": ort.__version__,
+        },
         "dataset": {
             "name": "mohanty/PlantVillage",
-            "configuration": "color",
+            "loader_configuration": "default (color)",
+            "revision": dataset_revision,
+            "license": dataset_info.card_data.get("license") if dataset_info.card_data else None,
             "classes": len(class_names),
             "train_examples": len(train_dataset),
             "validation_examples": len(validation_dataset),
+            "calibration_examples": len(calibration_dataset),
             "test_examples": len(test_dataset),
-            "leaf_group_overlap": 0,
+            "leaf_group_overlap_across_all_splits": 0,
             "training_class_counts": dict(sorted(Counter(labels_for_weights.tolist()).items())),
         },
-        "temperature": temperature,
+        "calibration": calibration_evidence,
         "acceptance_threshold": threshold,
+        "independent_test_selective_metrics": independent_test_selective,
+        "ood_sanity_check": {
+            "dataset": "CIFAR-100 test images (provisional non-leaf proxy only)",
+            "examples": int(ood_confidence.size),
+            "confidence_quantiles": {
+                "p50": float(np.quantile(ood_confidence, 0.50)),
+                "p90": float(np.quantile(ood_confidence, 0.90)),
+                "p95": float(np.quantile(ood_confidence, 0.95)),
+                "p99": float(np.quantile(ood_confidence, 0.99)),
+            },
+            "false_acceptance_at_selected_threshold": float((ood_confidence >= threshold_value).mean()),
+        },
         "validation": validation_metrics,
+        "calibration_split": calibration_split_metrics,
         "test": test_metrics,
         "history": history,
     }
-    write_json(output_dir / "metrics.json", metrics)
+
+    save_training_history(history, output_dir / "training_history.png")
+    save_confusion_matrix(
+        test_metrics["confusion_matrix"],
+        class_names,
+        output_dir / "test_confusion_matrix.csv",
+        output_dir / "test_confusion_matrix.png",
+    )
+    save_per_class_metrics(test_metrics["per_class"], class_names, output_dir / "test_per_class_metrics.csv")
 
     dummy = torch.zeros(1, 3, 224, 224, device=device)
+    onnx_path = output_dir / "crop_classifier.onnx"
     torch.onnx.export(
         calibrated,
         dummy,
-        output_dir / "crop_classifier.onnx",
+        onnx_path,
         input_names=["image"],
         output_names=["logits"],
         dynamic_axes={"image": {0: "batch"}, "logits": {0: "batch"}},
         opset_version=17,
         dynamo=False,
     )
+    parity_images, _ = next(iter(test_loader))
+    metrics["onnx_verification"] = verify_onnx_export(calibrated, parity_images[:8], onnx_path, device)
+    metrics_path = output_dir / "metrics.json"
+    write_json(metrics_path, metrics)
+    manifest = {
+        "model_version": version,
+        "production_approved": False,
+        "candidate_only": True,
+        "acceptance_threshold": threshold_value,
+        "artifacts": {
+            "crop_classifier.onnx": sha256(onnx_path),
+            "labels.json": sha256(output_dir / "labels.json"),
+            "metrics.json": sha256(metrics_path),
+        },
+        "required_next_gate": "Independent field-photo and realistic unsupported-image evaluation",
+    }
+    write_json(output_dir / "candidate_manifest.json", manifest)
     print(json.dumps({"output_dir": str(output_dir), "model_version": version, "threshold": threshold, "test_accuracy": test_metrics["accuracy"], "test_macro_f1": test_metrics["macro_f1"]}, indent=2))
 
 
