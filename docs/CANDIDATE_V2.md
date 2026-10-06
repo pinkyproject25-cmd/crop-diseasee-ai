@@ -59,6 +59,50 @@ Expected evidence:
 - `train_manifest.csv`
 - `clean_train_manifest.csv`
 
+## Completed audit and manual review
+
+The pinned audit completed on 2,578 decodable images (2,342 train and 236
+test), with no decode errors. It found 17 exact duplicate groups containing 34
+images. The automatic integrity rules excluded 20 training images and produced
+2,322 initially clean training rows.
+
+The perceptual review then examined all three cross-split near-duplicate pairs
+and all 23 different-label near-duplicate pairs. Each reviewed pair contained
+the same or a near-identical source photograph. The conservative decision is:
+
+- remove every training-side cross-split near duplicate;
+- remove both training sides of every conflicting-label near duplicate;
+- never guess or repair a disputed source label; and
+- leave PlantDoc test entirely outside training.
+
+This identified 45 unique training paths. One was already removed by the exact
+audit, so the committed manual quarantine removes 44 additional rows. The
+reviewed Candidate-v2 PlantDoc training manifest therefore contains 2,278
+images. This authorizes controlled Candidate-v2 experimentation only; it does
+not approve a model for production.
+
+After pulling the review commit in the same CPU runtime, finalize the manifest:
+
+```bash
+cd /content/crop-diseasee-ai-parallel
+git pull --ff-only origin main
+
+python training/finalize_plantdoc_manifest.py \
+  --audit-summary /content/drive/MyDrive/CropDiseaseAIParallel/plantdoc_audit_v1/audit_summary.json \
+  --clean-manifest /content/drive/MyDrive/CropDiseaseAIParallel/plantdoc_audit_v1/clean_train_manifest.csv \
+  --output-dir /content/drive/MyDrive/CropDiseaseAIParallel/plantdoc_audit_v1
+```
+
+Expected final output:
+
+- `reviewed_train_manifest.csv` with 2,278 rows;
+- `manifest_review.json` with `production_approved: false`; and
+- `training_authorized: true`, scoped only to Candidate-v2 experimentation.
+
+The finalizer verifies the SHA-256 hashes of the reviewed audit inputs before
+writing anything, so a changed or accidentally substituted audit will stop
+instead of silently producing a different dataset.
+
 ## Candidate-v2 constraints
 
 - PlantDoc `test` is a consumed benchmark and remains evaluation-only.
@@ -71,6 +115,8 @@ Expected evidence:
 - The model remains `production_approved: false` until both field and realistic
   unsupported-image gates pass.
 
-The GPU configuration and epoch schedule will be fixed only after the audit
-establishes the usable field-training counts. This prevents choosing a training
-recipe without knowing the effective data size and leakage risk.
+The next code milestone is a mixed-domain Candidate-v2 trainer using the 2,278
+reviewed PlantDoc training images together with PlantVillage training data.
+Model selection and calibration must remain independent of the consumed
+PlantDoc test split. The GPU configuration and epoch schedule will be committed
+before Candidate-v2 training begins.

@@ -53,6 +53,15 @@ Never use the original project's repository, Colab notebook, Vercel project, Ren
   CPU-only step. The audit verifies the pinned dataset, checks decoding and
   mappings, removes only exact leakage/duplicates, flags perceptual similarity,
   and keeps PlantDoc test out of the generated training manifest.
+- Completed the pinned PlantDoc audit: 2,578/2,578 images decoded, no errors,
+  20 exact-integrity training exclusions, and 2,322 initially clean rows.
+- Completed visual review of every cross-split and conflicting-label
+  near-duplicate pair. The committed conservative quarantine removes 44 more
+  rows (with one reviewed path already removed by the exact audit), yielding a
+  2,278-row Candidate-v2 PlantDoc training manifest.
+- Added `training/finalize_plantdoc_manifest.py` and the hash-pinned manual
+  quarantine decision. The finalizer validates the uploaded evidence and keeps
+  `production_approved` false.
 
 ## Current parallel behavior
 
@@ -76,17 +85,18 @@ invent a crop or disease prediction, which remains the intended behavior.
 
 ## Remaining work
 
-1. Run and review the CPU-only PlantDoc audit before approving any Candidate-v2
-   field-training manifest, then reserve a different licensed field set for
-   untouched final evaluation.
-2. Recalibrate candidate v2 without tuning on the now-consumed PlantDoc test
+1. Pull the latest parallel commit in the existing CPU runtime and run the
+   manifest finalizer against `plantdoc_audit_v1`; retain its two output files.
+2. Implement and run a fixed mixed-domain Candidate-v2 recipe using the
+   reviewed PlantDoc train manifest and leakage-controlled PlantVillage data.
+3. Recalibrate candidate v2 without tuning on the now-consumed PlantDoc test
    split, then evaluate a source-documented realistic unsupported/non-leaf suite.
-3. Keep `production_approved` false and do not install candidate v1.
-4. Review the 36 controlled-test errors, especially visually similar tomato diseases, and gather more evidence for low-support classes such as potato healthy.
-5. Implement and validate disease-area/severity estimation.
-6. Complete and agriculturally review the symptoms, causes, and recommendations knowledge base.
-7. Complete working English, Telugu, and Hindi translation and speech.
-8. Create isolated Vercel and Render resources only after a scientific candidate is approved; install only an approved model and run full end-to-end verification.
+4. Keep `production_approved` false and do not install candidate v1.
+5. Review the 36 controlled-test errors, especially visually similar tomato diseases, and gather more evidence for low-support classes such as potato healthy.
+6. Implement and validate disease-area/severity estimation.
+7. Complete and agriculturally review the symptoms, causes, and recommendations knowledge base.
+8. Complete working English, Telugu, and Hindi translation and speech.
+9. Create isolated Vercel and Render resources only after a scientific candidate is approved; install only an approved model and run full end-to-end verification.
 
 ## Integrity rules
 

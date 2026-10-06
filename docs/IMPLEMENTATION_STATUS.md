@@ -22,10 +22,17 @@
 - Candidate v1 completed controlled evaluation but failed the predefined
   independent PlantDoc field gate (`9.75%` coverage and `52.17%` accepted
   accuracy at threshold `0.99`). It is not approved or installed.
+- The pinned PlantDoc train/test audit decoded all 2,578 images with no errors,
+  automatically removed 20 exact training duplicates/conflicts, and produced
+  2,322 clean training rows. Manual review conservatively quarantined 44 more
+  rows implicated in cross-split or conflicting-label near duplicates, leaving
+  2,278 reviewed field-training images for Candidate-v2 experimentation.
 
 ## Scientific gates before the application can claim real production analysis
 
-- Train and export a revised classifier with adequate field-domain evidence.
+- Implement, train, and export a mixed-domain Candidate-v2 classifier using
+  only the reviewed PlantDoc training manifest plus leakage-controlled
+  PlantVillage training data.
 - Reconfirm class-wise performance on leakage-independent controlled and field
   splits; PlantDoc test is now a consumed benchmark, not a tuning set.
 - Pass a different untouched field-photo gate and a source-documented

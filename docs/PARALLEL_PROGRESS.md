@@ -42,6 +42,18 @@ Updated: 2026-10-06 (Asia/Kolkata)
   decodes every image, detects exact pixel duplication/leakage, flags perceptual
   near-duplicates, and generates a review-required training manifest without
   ever adding PlantDoc test images to training.
+- Completed that audit on all 2,578 pinned PlantDoc images with zero decode
+  errors. Exact-integrity rules excluded 20 training images and left 2,322
+  initially clean rows.
+- Visually reviewed all three cross-split near-duplicate pairs and all 23
+  different-label near-duplicate pairs. Every pair represented the same or a
+  near-identical source photograph, so no disputed labels were guessed or
+  repaired. A conservative committed quarantine removes 44 additional rows
+  (one of 45 flagged paths was already excluded), leaving 2,278 reviewed
+  PlantDoc training images.
+- Added a hash-pinned manifest finalizer that refuses changed audit evidence,
+  enforces train-only/unique clean rows, applies the reviewed quarantine, and
+  records `production_approved: false` in its review evidence.
 
 ## Verification
 
@@ -89,6 +101,14 @@ Updated: 2026-10-06 (Asia/Kolkata)
 - At the fixed `0.99` threshold, 23 images were accepted (coverage `9.75%`),
   12 were correct (accepted accuracy `52.17%`), and the accepted-accuracy 95%
   Wilson lower bound was `32.96%`. The predefined field gate failed.
+- Uploaded audit evidence verification: `audit_summary.json` SHA-256
+  `23056c43a866bd8d0c4590c07641863371776612d2c8fb9fd9846c6fb0181d01`;
+  `clean_train_manifest.csv` SHA-256
+  `d2fd5a3846bb7d053e87330c32a943d3ca69b16850e1227b34c99e712a88a631`.
+- Manifest finalizer integration check passed: 2,322 clean input rows, 44
+  additional quarantines, 2,278 output rows, 28 represented target classes,
+  and deterministic reviewed-manifest SHA-256
+  `66e8326295550f5e8453182dbf0bfcddf7af7d06a3a8e9954c3e5f9322ee2b62`.
 
 ## Deployment state
 
@@ -123,14 +143,15 @@ Updated: 2026-10-06 (Asia/Kolkata)
 
 ## Next actions
 
-1. Run and review the Candidate-v2 PlantDoc audit in a CPU-only Colab runtime;
-   resolve corrupt images, cross-split duplicates, and label conflicts before
-   approving any field-training manifest.
-2. Refit calibration and rejection using only candidate-v2 calibration data;
+1. Run the committed finalizer against the Drive-backed audit evidence and
+   retain `reviewed_train_manifest.csv` plus `manifest_review.json`.
+2. Implement and run the predefined mixed-domain Candidate-v2 training recipe;
+   keep PlantDoc test excluded from training, model selection, and calibration.
+3. Refit calibration and rejection using only candidate-v2 calibration data;
    do not tune against the consumed PlantDoc test results.
-3. Assemble a source-documented realistic unsupported/non-leaf suite and
+4. Assemble a source-documented realistic unsupported/non-leaf suite and
    measure false acceptance under the separately predefined OOD gate.
-4. Keep every candidate out of the backend until both independent field and
+5. Keep every candidate out of the backend until both independent field and
    realistic OOD gates pass.
 
 ## Relevant commit
