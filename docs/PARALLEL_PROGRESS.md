@@ -26,6 +26,12 @@ Updated: 2026-10-06 (Asia/Kolkata)
 - Replaced the inherited Colab notebook with an isolated notebook that clones only the parallel repository and writes to `MyDrive/CropDiseaseAIParallel`.
 - Renamed the undeployed Render Blueprint service to `crop-diseasee-ai-parallel-api`.
 - Corrected stale documentation that previously described the original project's deployments and Colab as this clone's state.
+- Completed all 12 classifier-training epochs in the parallel Colab runtime; the
+  epoch-12 checkpoint and training history are persisted in Google Drive.
+- Corrected a post-training calibration failure by changing `collect_logits`
+  from `torch.inference_mode()` to `torch.no_grad()`. This preserves
+  gradient-free model evaluation while allowing LBFGS to optimize the
+  temperature parameter against the collected logits.
 
 ## Verification
 
@@ -37,7 +43,14 @@ Updated: 2026-10-06 (Asia/Kolkata)
 - Backend smoke checks: `/health` 200 with `model_ready=false`; unsupported MIME 415; analysis without a model 503 with no fabricated prediction.
 - New parallel T4 runtime and Drive checkpoint directory: started successfully.
 - First training attempt: stopped before epoch 1 by the strict leakage check after detecting 227 overlapping source-partition groups; no model or metrics were produced.
-- Full GPU training and ONNX parity execution: pending rerun with the corrected custom split.
+- Full 12-epoch GPU training: passed. Final model-selection validation accuracy
+  was `0.9929798633` and macro-F1 was `0.9908847217`.
+- The first post-training evaluation attempt stopped during temperature fitting
+  because inference tensors cannot participate in an autograd graph. The fix is
+  committed; rerunning the same command resumes after epoch 12, so no training
+  epochs need to be repeated.
+- Independent-test metrics, OOD evidence, and ONNX parity: pending the resumed
+  post-training evaluation.
 
 ## Deployment state
 
@@ -48,7 +61,8 @@ Updated: 2026-10-06 (Asia/Kolkata)
 
 ## Known problems and scientific blockers
 
-- No completed classifier run or measured accuracy/macro-F1 exists yet.
+- High model-selection validation performance is not production approval;
+  independent-test, field-image, OOD, and calibration evidence remains pending.
 - CIFAR-100 is only a provisional non-leaf OOD sanity check.
 - PlantDoc or another licensed field-image evaluation set must be mapped and evaluated independently.
 - The rejection threshold cannot be approved until realistic unsupported and field inputs are measured.
@@ -60,11 +74,12 @@ Updated: 2026-10-06 (Asia/Kolkata)
 
 ## Next actions
 
-1. Commit and push this training-readiness milestone only to the parallel repository.
-2. Start a completely new Colab GPU runtime from the repository notebook.
-3. Finish the candidate run and preserve Drive checkpoints/artifacts.
-4. Review the confusion matrix, per-class metrics, macro-F1, calibration, selected threshold, test selective metrics, and ONNX parity evidence.
-5. Design and run the licensed field/OOD evaluation before any production approval or model installation.
+1. Pull the calibration fix into the active parallel Colab worktree and rerun
+   the same training command; it will resume after epoch 12 and continue with
+   calibration, independent testing, OOD checks, and ONNX export.
+2. Preserve and review the confusion matrix, per-class metrics, macro-F1,
+   calibration, selected threshold, test selective metrics, and ONNX parity evidence.
+3. Design and run the licensed field/OOD evaluation before any production approval or model installation.
 
 ## Relevant commit
 
