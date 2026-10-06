@@ -49,8 +49,21 @@ Updated: 2026-10-06 (Asia/Kolkata)
   because inference tensors cannot participate in an autograd graph. The fix is
   committed; rerunning the same command resumes after epoch 12, so no training
   epochs need to be repeated.
-- Independent-test metrics, OOD evidence, and ONNX parity: pending the resumed
-  post-training evaluation.
+- Resumed from the Drive-backed epoch-12 checkpoint after the calibration fix;
+  calibration, independent testing, CIFAR-100 OOD sanity checking, artifact
+  generation, and ONNX parity verification completed successfully.
+- Candidate `plantvillage-mnv3-20261006T022813Z` achieved test accuracy
+  `0.9933456562`, test macro-F1 `0.9915131174`, and test ECE
+  `0.0025011350` on 5,410 group-independent PlantVillage examples.
+- Temperature scaling reduced calibration-split ECE from `0.1345514788` to
+  `0.0023865518` with temperature `0.4217035472`.
+- The provisional `0.99` acceptance threshold retained `94.60%` of the test
+  set with `99.88%` accepted accuracy. CIFAR-100 false acceptance was `0.71%`.
+- ONNX parity passed on eight examples with 8/8 top-1 agreement and maximum
+  absolute logit error `3.8147e-05`.
+- The uploaded `metrics.json` SHA-256 matches its candidate manifest. The ONNX
+  and labels hashes remain recorded in the manifest but were not independently
+  re-hashed outside Colab.
 
 ## Deployment state
 
@@ -61,8 +74,13 @@ Updated: 2026-10-06 (Asia/Kolkata)
 
 ## Known problems and scientific blockers
 
-- High model-selection validation performance is not production approval;
-  independent-test, field-image, OOD, and calibration evidence remains pending.
+- High controlled-dataset performance is not production approval. Field-image
+  and realistic unsupported-image evaluation remains pending.
+- The 36 independent-test errors are concentrated in visually similar tomato
+  diseases. The largest pairs are tomato late blight to early blight (5) and
+  tomato spider mites to target spot (5).
+- Potato healthy has only 16 independent-test examples and the lowest per-class
+  F1 (`0.9375`), so its controlled-set estimate has high sampling uncertainty.
 - CIFAR-100 is only a provisional non-leaf OOD sanity check.
 - PlantDoc or another licensed field-image evaluation set must be mapped and evaluated independently.
 - The rejection threshold cannot be approved until realistic unsupported and field inputs are measured.
@@ -74,14 +92,16 @@ Updated: 2026-10-06 (Asia/Kolkata)
 
 ## Next actions
 
-1. Pull the calibration fix into the active parallel Colab worktree and rerun
-   the same training command; it will resume after epoch 12 and continue with
-   calibration, independent testing, OOD checks, and ONNX export.
-2. Preserve and review the confusion matrix, per-class metrics, macro-F1,
-   calibration, selected threshold, test selective metrics, and ONNX parity evidence.
-3. Design and run the licensed field/OOD evaluation before any production approval or model installation.
+1. Design and run a reproducible, license-reviewed field-image evaluation with
+   PlantDoc or another suitable dataset, including explicit class mapping and
+   unsupported-class handling.
+2. Build a realistic unsupported/non-leaf suite and measure threshold coverage,
+   accepted accuracy, false acceptance, and failure examples.
+3. Keep the candidate out of the backend until those gates pass; then review
+   whether the threshold should remain `0.99` before any production approval.
 
 ## Relevant commit
 
 - Training-readiness milestone: `684ad9593a6c2eb5e4cf9164488c887b4ca40c06`.
 - Leakage-free custom split correction: `01da124048f59ff55b3ee1fb7b2de1765ebf1e76`.
+- Temperature-calibration fix: `54e8c7d9b2d7fcfe601fab3b9c54affa8711bb67`.
