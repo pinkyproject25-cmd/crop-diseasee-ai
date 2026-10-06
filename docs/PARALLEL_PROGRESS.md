@@ -65,4 +65,4 @@ Updated: 2026-10-06 (Asia/Kolkata)
 
 ## Relevant commit
 
-- Training-readiness milestone: `331e4d46d85685bd828be889ef8e271c90aa89a0`.
+- Training-readiness milestone: `684ad9593a6c2eb5e4cf9164488c887b4ca40c06`.

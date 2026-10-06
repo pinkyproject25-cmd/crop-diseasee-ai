@@ -58,5 +58,5 @@ The parallel application is not deployed. No diagnostic model has been approved 
 ## Repository state
 
 - Takeover base commit: `fedbbebac0173f59c09fafc84eb854a23902c860`.
-- Training-readiness milestone commit: `331e4d46d85685bd828be889ef8e271c90aa89a0`.
+- Training-readiness milestone commit: `684ad9593a6c2eb5e4cf9164488c887b4ca40c06`.
 - Detailed progress: `docs/PARALLEL_PROGRESS.md`.
