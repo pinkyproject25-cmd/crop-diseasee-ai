@@ -18,7 +18,7 @@
 - Generated files, local secrets, caches, and unreviewed model binaries are excluded from Git.
 - Frontend TypeScript checking and the Vite production build pass locally.
 - Backend smoke checks pass for health, unsupported media, and deliberate missing-model refusal.
-- The training pipeline separates model-selection validation from calibration, verifies leaf-group independence, writes resumable checkpoints, exports per-class/confusion-matrix evidence, and verifies ONNX parity.
+- The training pipeline creates fresh leaf-group-independent train/validation/calibration/test partitions, writes resumable checkpoints, exports per-class/confusion-matrix evidence, and verifies ONNX parity.
 
 ## Scientific gates before the application can claim real production analysis
 

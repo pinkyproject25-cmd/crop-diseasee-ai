@@ -17,7 +17,8 @@ Updated: 2026-10-06 (Asia/Kolkata)
 - Detected one Render workspace but did not select it, inspect services, create a service, or change any setting.
 - Confirmed there are no classifier artifacts or completed training metrics in the repository.
 - Separated model-selection validation from the temperature/threshold calibration split.
-- Added explicit physical-leaf overlap checks across the published PlantVillage train/test split and all internal splits.
+- Audited the loader's published PlantVillage partitions and found 227 overlapping physical `leaf_id` groups during the first parallel Colab attempt.
+- Replaced reliance on those source partitions with a fresh 10-fold stratified group split: seven training folds plus distinct model-selection validation, calibration, and untouched test folds.
 - Added persistent epoch checkpoint/resume support suitable for Google Drive.
 - Added dataset revision and software-version recording.
 - Added calibration before/after NLL and ECE evidence, independent-test selective metrics, OOD confidence summaries, per-class CSV, confusion-matrix CSV/PNG, and training curves.
@@ -34,7 +35,9 @@ Updated: 2026-10-06 (Asia/Kolkata)
 - Python backend and training source compilation: passed.
 - Colab notebook JSON validation: passed.
 - Backend smoke checks: `/health` 200 with `model_ready=false`; unsupported MIME 415; analysis without a model 503 with no fabricated prediction.
-- Full GPU training and ONNX parity execution: pending a new parallel Colab GPU runtime.
+- New parallel T4 runtime and Drive checkpoint directory: started successfully.
+- First training attempt: stopped before epoch 1 by the strict leakage check after detecting 227 overlapping source-partition groups; no model or metrics were produced.
+- Full GPU training and ONNX parity execution: pending rerun with the corrected custom split.
 
 ## Deployment state
 

@@ -23,7 +23,7 @@ import numpy as np
 import onnxruntime as ort
 import torch
 import torchvision
-from datasets import Dataset, DatasetDict, load_dataset
+from datasets import Dataset, DatasetDict, concatenate_datasets, load_dataset
 from huggingface_hub import HfApi, hf_hub_download
 from matplotlib import pyplot as plt
 from PIL import Image
@@ -52,6 +52,8 @@ class TrainConfig:
     seed: int = 7386
     val_fold: int = 0
     calibration_fold: int = 1
+    test_fold: int = 2
+    split_folds: int = 10
     ood_limit: int = 10_000
     resume: bool = True
 
@@ -95,6 +97,8 @@ def parse_args() -> TrainConfig:
     parser.add_argument("--seed", type=int, default=7386)
     parser.add_argument("--val-fold", type=int, default=0)
     parser.add_argument("--calibration-fold", type=int, default=1)
+    parser.add_argument("--test-fold", type=int, default=2)
+    parser.add_argument("--split-folds", type=int, default=10)
     parser.add_argument("--ood-limit", type=int, default=10_000)
     parser.add_argument("--no-resume", action="store_false", dest="resume")
     return TrainConfig(**vars(parser.parse_args()))
@@ -137,37 +141,54 @@ def group_split(
     seed: int,
     validation_fold: int,
     calibration_fold: int,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    test_fold: int,
+    split_folds: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     labels = np.asarray(source["label"], dtype=np.int64)
     groups = np.asarray(source["leaf_id"], dtype=str)
     if np.any(groups == "unknown"):
         raise RuntimeError("PlantVillage rows without leaf_id cannot be used for leakage-safe splitting.")
-    splitter = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=seed)
+    group_labels: dict[str, int] = {}
+    for group, label in zip(groups, labels):
+        previous = group_labels.setdefault(group, int(label))
+        if previous != int(label):
+            raise RuntimeError(f"Leaf group {group!r} appears under more than one class.")
+
+    if split_folds < 4:
+        raise RuntimeError("At least four folds are required for train, validation, calibration, and test partitions.")
+    splitter = StratifiedGroupKFold(n_splits=split_folds, shuffle=True, random_state=seed)
     splits = list(splitter.split(np.zeros(labels.shape[0]), labels, groups))
     validation_fold %= len(splits)
     calibration_fold %= len(splits)
-    if validation_fold == calibration_fold:
-        raise RuntimeError("Validation and calibration folds must be different.")
+    test_fold %= len(splits)
+    if len({validation_fold, calibration_fold, test_fold}) != 3:
+        raise RuntimeError("Validation, calibration, and test folds must be different.")
 
     validation_indices = splits[validation_fold][1]
     calibration_indices = splits[calibration_fold][1]
-    held_out = np.concatenate([validation_indices, calibration_indices])
+    test_indices = splits[test_fold][1]
+    held_out = np.concatenate([validation_indices, calibration_indices, test_indices])
     train_indices = np.setdiff1d(np.arange(labels.shape[0]), held_out, assume_unique=False)
 
-    index_sets = [set(groups[indices]) for indices in (train_indices, validation_indices, calibration_indices)]
-    if index_sets[0] & index_sets[1] or index_sets[0] & index_sets[2] or index_sets[1] & index_sets[2]:
-        raise RuntimeError("Leaf-group leakage detected across training, validation, and calibration splits.")
-    return train_indices, validation_indices, calibration_indices
+    index_sets = [set(groups[indices]) for indices in (train_indices, validation_indices, calibration_indices, test_indices)]
+    for left in range(len(index_sets)):
+        for right in range(left + 1, len(index_sets)):
+            if index_sets[left].intersection(index_sets[right]):
+                raise RuntimeError("Leaf-group leakage detected across custom dataset splits.")
+    expected_classes = set(range(int(labels.max()) + 1))
+    for name, indices in zip(("training", "validation", "calibration", "test"), (train_indices, validation_indices, calibration_indices, test_indices)):
+        missing = expected_classes.difference(map(int, labels[indices]))
+        if missing:
+            raise RuntimeError(f"The {name} split is missing class indices: {sorted(missing)}")
+    return train_indices, validation_indices, calibration_indices, test_indices
 
 
-def assert_independent_test_split(source_train: Dataset, source_test: Dataset) -> None:
+def published_split_overlap(source_train: Dataset, source_test: Dataset) -> int:
     train_groups = set(map(str, source_train["leaf_id"]))
     test_groups = set(map(str, source_test["leaf_id"]))
     if "unknown" in train_groups or "unknown" in test_groups:
         raise RuntimeError("PlantVillage rows without leaf_id cannot be used for independent evaluation.")
-    overlap = train_groups.intersection(test_groups)
-    if overlap:
-        raise RuntimeError(f"Train/test leaf-group leakage detected for {len(overlap)} groups.")
+    return len(train_groups.intersection(test_groups))
 
 
 def build_model(class_count: int) -> nn.Module:
@@ -382,7 +403,7 @@ def save_confusion_matrix(
     rendered = axis.imshow(normalized, interpolation="nearest", cmap="Blues", vmin=0, vmax=1)
     figure.colorbar(rendered, ax=axis, fraction=0.03, pad=0.02, label="Fraction of actual class")
     axis.set(
-        title="PlantVillage independent test confusion matrix (row-normalized)",
+        title="PlantVillage custom group-independent test confusion matrix (row-normalized)",
         xlabel="Predicted class",
         ylabel="Actual class",
         xticks=np.arange(len(class_names)),
@@ -478,23 +499,26 @@ def main() -> None:
     data: DatasetDict = load_dataset(loader_path, "default", trust_remote_code=True)
     source_train = data["train"]
     source_test = data["test"]
-    assert_independent_test_split(source_train, source_test)
-    label_feature = source_train.features["label"]
+    source_split_overlap = published_split_overlap(source_train, source_test)
+    source = concatenate_datasets([source_train, source_test])
+    label_feature = source.features["label"]
     class_names = list(label_feature.names)
     if len(class_names) != 38:
         raise RuntimeError(f"Expected 38 PlantVillage classes; received {len(class_names)}.")
 
-    train_indices, validation_indices, calibration_indices = group_split(
-        source_train,
+    train_indices, validation_indices, calibration_indices, test_indices = group_split(
+        source,
         config.seed,
         config.val_fold,
         config.calibration_fold,
+        config.test_fold,
+        config.split_folds,
     )
     train_transform, eval_transform = image_transforms()
-    train_dataset = LeafDataset(source_train, train_indices, train_transform)
-    validation_dataset = LeafDataset(source_train, validation_indices, eval_transform)
-    calibration_dataset = LeafDataset(source_train, calibration_indices, eval_transform)
-    test_dataset = LeafDataset(source_test, range(len(source_test)), eval_transform)
+    train_dataset = LeafDataset(source, train_indices, train_transform)
+    validation_dataset = LeafDataset(source, validation_indices, eval_transform)
+    calibration_dataset = LeafDataset(source, calibration_indices, eval_transform)
+    test_dataset = LeafDataset(source, test_indices, eval_transform)
     loader_options = {
         "batch_size": config.batch_size,
         "num_workers": config.num_workers,
@@ -508,7 +532,7 @@ def main() -> None:
 
     model = build_model(len(class_names)).to(device)
     set_feature_training(model, False)
-    labels_for_weights = np.asarray(source_train.select(train_indices.tolist())["label"], dtype=np.int64)
+    labels_for_weights = np.asarray(source.select(train_indices.tolist())["label"], dtype=np.int64)
     criterion = nn.CrossEntropyLoss(weight=make_class_weights(labels_for_weights, len(class_names), device), label_smoothing=0.04)
     optimizer = torch.optim.AdamW(filter(lambda parameter: parameter.requires_grad, model.parameters()), lr=config.learning_rate, weight_decay=config.weight_decay)
     scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda")
@@ -523,7 +547,7 @@ def main() -> None:
     if config.resume and checkpoint_path.exists():
         checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
         checkpoint_config = checkpoint.get("config", {})
-        immutable_keys = ("epochs", "warmup_epochs", "batch_size", "learning_rate", "weight_decay", "seed", "val_fold", "calibration_fold")
+        immutable_keys = ("epochs", "warmup_epochs", "batch_size", "learning_rate", "weight_decay", "seed", "val_fold", "calibration_fold", "test_fold", "split_folds")
         mismatches = [key for key in immutable_keys if checkpoint_config.get(key) != getattr(config, key)]
         if mismatches:
             raise RuntimeError(f"Resume checkpoint configuration differs for: {', '.join(mismatches)}. Use a new output directory or --no-resume.")
@@ -645,6 +669,11 @@ def main() -> None:
             "revision": dataset_revision,
             "license": dataset_info.card_data.get("license") if dataset_info.card_data else None,
             "classes": len(class_names),
+            "source_examples": len(source),
+            "source_train_examples": len(source_train),
+            "source_test_examples": len(source_test),
+            "published_split_leaf_group_overlap": source_split_overlap,
+            "custom_split_folds": config.split_folds,
             "train_examples": len(train_dataset),
             "validation_examples": len(validation_dataset),
             "calibration_examples": len(calibration_dataset),

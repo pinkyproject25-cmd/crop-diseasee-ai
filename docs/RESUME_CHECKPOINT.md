@@ -23,7 +23,7 @@ Never use the original project's repository, Colab notebook, Vercel project, Ren
 - Added a hosted classifier-training pipeline using MobileNetV3 Small, group-aware splitting, augmentation, class weights, calibration, out-of-distribution checks, ONNX export, and explicit production blockers.
 - Replaced the inherited notebook with an isolated parallel Colab workflow that clones only this repository and stores resumable output under `MyDrive/CropDiseaseAIParallel`.
 - Corrected the PlantVillage loader for current Colab behavior by pinning `datasets==3.6.0`, downloading the reviewed repository loader with `hf_hub_download`, and loading its `default` configuration with `trust_remote_code=True`.
-- Separated the model-selection validation fold from the calibration fold, added an explicit published train/test leaf-group overlap check, resumable epoch checkpoints, dataset revision recording, calibration before/after evidence, independent-test selective metrics, per-class CSV, confusion-matrix CSV/PNG, training curves, candidate manifest hashes, and ONNX parity verification.
+- Separated model selection, calibration, and testing into distinct custom leaf-group folds; added source-partition overlap auditing, resumable epoch checkpoints, dataset revision recording, calibration before/after evidence, independent-test selective metrics, per-class CSV, confusion-matrix CSV/PNG, training curves, candidate manifest hashes, and ONNX parity verification.
 - Verified locally that the frontend builds, the backend smoke tests pass, the training script compiles, and the notebook is valid JSON.
 
 ## Current parallel behavior
@@ -34,6 +34,7 @@ The parallel application is not deployed. No diagnostic model has been approved 
 
 - No new parallel Colab runtime has been started yet.
 - The repository notebook requests a new GPU runtime, mounts Drive, verifies the Git origin, and resumes from the persistent checkpoint directory.
+- The first new T4 attempt exposed 227 overlapping `leaf_id` groups in the loader's published train/test partitions and correctly stopped before training; the pipeline now creates a fresh 10-fold group-independent split.
 - Metrics remain unavailable until that new run completes.
 - The original project's earlier T4 runtime and interrupted epoch are historical only and must not be resumed or modified.
 
