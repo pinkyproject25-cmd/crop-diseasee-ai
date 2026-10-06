@@ -33,3 +33,10 @@ Dataset sources used by the validation plan:
 The next gate is implemented by `evaluate_candidate.py`. See
 `docs/FIELD_EVALUATION.md` for the pinned PlantDoc test procedure, explicit class
 mapping, artifact-integrity checks, and realistic unsupported-image workflow.
+
+Candidate v1 failed that field gate. Before any candidate-v2 training, run
+`audit_plantdoc.py` against the pinned PlantDoc repository. It validates image
+decoding and mappings, detects exact pixel duplicates and train/test leakage,
+flags perceptual near-duplicates, and writes a reviewable training manifest.
+See `docs/CANDIDATE_V2.md` for the CPU-only Colab procedure. The generated clean
+manifest is not approved for training until its review artifacts are examined.

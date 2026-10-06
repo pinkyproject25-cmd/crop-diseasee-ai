@@ -38,6 +38,10 @@ Updated: 2026-10-06 (Asia/Kolkata)
 - Reviewed all 11 field errors that passed the `0.99` threshold. Two corn
   examples warrant independent label review, but even crediting both to the
   model cannot change the failed gate decision.
+- Added a CPU-only Candidate-v2 PlantDoc audit that verifies the pinned source,
+  decodes every image, detects exact pixel duplication/leakage, flags perceptual
+  near-duplicates, and generates a review-required training manifest without
+  ever adding PlantDoc test images to training.
 
 ## Verification
 
@@ -119,9 +123,9 @@ Updated: 2026-10-06 (Asia/Kolkata)
 
 ## Next actions
 
-1. Design candidate v2 around field-domain generalization. Audit and deduplicate
-   PlantDoc train data, use it only as training/development evidence, and keep
-   a different licensed field dataset untouched for final evaluation.
+1. Run and review the Candidate-v2 PlantDoc audit in a CPU-only Colab runtime;
+   resolve corrupt images, cross-split duplicates, and label conflicts before
+   approving any field-training manifest.
 2. Refit calibration and rejection using only candidate-v2 calibration data;
    do not tune against the consumed PlantDoc test results.
 3. Assemble a source-documented realistic unsupported/non-leaf suite and

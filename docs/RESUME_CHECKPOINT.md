@@ -49,6 +49,10 @@ Never use the original project's repository, Colab notebook, Vercel project, Ren
   accepted accuracy (12/23), and `32.96%` accepted-accuracy Wilson lower bound.
   All 11 accepted errors were manually reviewed; two possible source-label
   anomalies do not alter the failure decision.
+- Added `training/audit_plantdoc.py` and `docs/CANDIDATE_V2.md` for the next
+  CPU-only step. The audit verifies the pinned dataset, checks decoding and
+  mappings, removes only exact leakage/duplicates, flags perceptual similarity,
+  and keeps PlantDoc test out of the generated training manifest.
 
 ## Current parallel behavior
 
@@ -72,9 +76,9 @@ invent a crop or disease prediction, which remains the intended behavior.
 
 ## Remaining work
 
-1. Build a candidate-v2 plan focused on field-domain generalization: audit and
-   deduplicate PlantDoc train, add field-domain training, and reserve a
-   different licensed field set for untouched final evaluation.
+1. Run and review the CPU-only PlantDoc audit before approving any Candidate-v2
+   field-training manifest, then reserve a different licensed field set for
+   untouched final evaluation.
 2. Recalibrate candidate v2 without tuning on the now-consumed PlantDoc test
    split, then evaluate a source-documented realistic unsupported/non-leaf suite.
 3. Keep `production_approved` false and do not install candidate v1.
