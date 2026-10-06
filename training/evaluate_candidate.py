@@ -10,6 +10,7 @@ import argparse
 import csv
 import hashlib
 import json
+import math
 import subprocess
 from collections import Counter
 from dataclasses import asdict, dataclass
@@ -26,6 +27,11 @@ from sklearn.metrics import accuracy_score, f1_score
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
 MEAN = np.asarray([0.485, 0.456, 0.406], dtype=np.float32)
 STD = np.asarray([0.229, 0.224, 0.225], dtype=np.float32)
+FIELD_MIN_COVERAGE = 0.30
+FIELD_MIN_ACCEPTED_ACCURACY = 0.95
+FIELD_MIN_ACCEPTED_ACCURACY_WILSON_LOWER = 0.90
+OOD_MIN_IMAGES = 500
+OOD_MAX_FALSE_ACCEPTANCE = 0.01
 
 
 @dataclass(frozen=True)
@@ -258,6 +264,16 @@ def confidence_summary(results: list[Result]) -> dict[str, float]:
     return {f"p{percentile}": float(np.quantile(values, percentile / 100)) for percentile in (10, 25, 50, 75, 90, 95, 99)}
 
 
+def wilson_lower_bound(successes: int, total: int, z: float = 1.96) -> float:
+    if total == 0:
+        return 0.0
+    proportion = successes / total
+    denominator = 1 + z * z / total
+    centre = proportion + z * z / (2 * total)
+    margin = z * math.sqrt((proportion * (1 - proportion) + z * z / (4 * total)) / total)
+    return (centre - margin) / denominator
+
+
 def save_field_confusion(results: list[Result], labels: list[str], output_dir: Path) -> None:
     expected_labels = [label for label in labels if any(row.expected_label == label for row in results)]
     matrix = np.zeros((len(expected_labels), len(labels)), dtype=np.int64)
@@ -308,6 +324,15 @@ def field_metrics(
     predictions = [result.predicted_label for result in results]
     accepted = [result for result in results if result.accepted]
     correct_accepted = sum(bool(result.correct) for result in accepted)
+    coverage = len(accepted) / len(results)
+    accepted_accuracy = correct_accepted / len(accepted) if accepted else None
+    accepted_accuracy_lower = wilson_lower_bound(correct_accepted, len(accepted))
+    gate_passed = (
+        coverage >= FIELD_MIN_COVERAGE
+        and accepted_accuracy is not None
+        and accepted_accuracy >= FIELD_MIN_ACCEPTED_ACCURACY
+        and accepted_accuracy_lower >= FIELD_MIN_ACCEPTED_ACCURACY_WILSON_LOWER
+    )
     per_class_rows: list[dict[str, object]] = []
     for label in labels:
         rows = [result for result in results if result.expected_label == label]
@@ -350,13 +375,21 @@ def field_metrics(
         ),
         "accepted": len(accepted),
         "rejected": len(results) - len(accepted),
-        "coverage": len(accepted) / len(results),
-        "accepted_accuracy": correct_accepted / len(accepted) if accepted else None,
+        "coverage": coverage,
+        "accepted_accuracy": accepted_accuracy,
+        "accepted_accuracy_wilson_lower_95": accepted_accuracy_lower,
         "quality_rejected": sum(not result.quality_ok for result in results),
         "threshold_rejected_after_quality": sum(result.quality_ok and not result.accepted for result in results),
         "confidence_quantiles": confidence_summary(results),
         "errors_without_rejection": sum(not bool(result.correct) for result in results),
         "accepted_errors": sum(result.accepted and not bool(result.correct) for result in results),
+        "predefined_field_gate": {
+            "status": "passed" if gate_passed else "failed",
+            "minimum_coverage": FIELD_MIN_COVERAGE,
+            "minimum_accepted_accuracy": FIELD_MIN_ACCEPTED_ACCURACY,
+            "minimum_accepted_accuracy_wilson_lower_95": FIELD_MIN_ACCEPTED_ACCURACY_WILSON_LOWER,
+            "note": "Passing this gate does not approve production; realistic OOD and remaining scientific blockers still apply.",
+        },
         "required_decision": "Manual failure review and predefined field/OOD gate assessment",
     }
 
@@ -368,6 +401,9 @@ def ood_metrics(
     threshold: float,
 ) -> dict[str, object]:
     accepted = [result for result in results if result.accepted]
+    false_acceptance_rate = len(accepted) / len(results)
+    enough_images = len(results) >= OOD_MIN_IMAGES
+    gate_passed = enough_images and false_acceptance_rate <= OOD_MAX_FALSE_ACCEPTANCE
     return {
         "production_approved": False,
         "candidate_model_version": manifest.get("model_version"),
@@ -378,11 +414,17 @@ def ood_metrics(
         "decode_errors": decode_errors,
         "accepted": len(accepted),
         "rejected": len(results) - len(accepted),
-        "false_acceptance_rate": len(accepted) / len(results),
+        "false_acceptance_rate": false_acceptance_rate,
         "quality_rejected": sum(not result.quality_ok for result in results),
         "threshold_rejected_after_quality": sum(result.quality_ok and not result.accepted for result in results),
         "confidence_quantiles": confidence_summary(results),
         "accepted_prediction_counts": dict(Counter(result.predicted_label for result in accepted).most_common()),
+        "predefined_ood_gate": {
+            "status": "passed" if gate_passed else ("insufficient_images" if not enough_images else "failed"),
+            "minimum_images": OOD_MIN_IMAGES,
+            "maximum_false_acceptance_rate": OOD_MAX_FALSE_ACCEPTANCE,
+            "note": "Every accepted unsupported image still requires manual review.",
+        },
         "required_decision": "Manual inspection of every accepted unsupported image",
     }
 

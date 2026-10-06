@@ -71,6 +71,9 @@ Updated: 2026-10-06 (Asia/Kolkata)
   inference, refuses unmapped classes, and keeps the `0.99` threshold fixed.
 - Added an explicit mapping covering every class in PlantDoc's official test
   split plus its train-only tomato spider-mite class.
+- Predefined the field gate before viewing results: at least 30% coverage, 95%
+  accepted accuracy, and a 90% lower bound for its 95% Wilson interval. The OOD
+  gate requires at least 500 documented images and at most 1% false acceptance.
 
 ## Deployment state
 

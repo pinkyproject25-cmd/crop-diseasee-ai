@@ -39,6 +39,9 @@ Never use the original project's repository, Colab notebook, Vercel project, Ren
   `docs/FIELD_EVALUATION.md` for the next external field/OOD gate. The evaluator
   verifies candidate hashes, mirrors production preprocessing/quality checks,
   and fixes the acceptance threshold before examining field results.
+- Field pass criteria were fixed before execution (30% coverage, 95% accepted
+  accuracy, 90% Wilson lower bound); the realistic OOD gate requires at least
+  500 documented images and no more than 1% false acceptance.
 
 ## Current parallel behavior
 

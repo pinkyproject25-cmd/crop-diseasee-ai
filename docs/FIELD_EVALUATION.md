@@ -46,6 +46,11 @@ Review `field_metrics.json`, `field_per_class_metrics.csv`, the confusion matrix
 and every row in `field_top_confident_errors.csv`. Do not tune the threshold on
 this test split.
 
+The field gate is fixed before inspecting results: at least 30% coverage, at
+least 95% accepted accuracy, and a 95% Wilson lower confidence bound of at least
+90% for accepted accuracy. Passing this gate still does not grant production
+approval.
+
 ## Realistic unsupported-image run
 
 Place a separately sourced, license-compatible suite under a Drive directory.
@@ -67,3 +72,7 @@ python training/evaluate_candidate.py \
 Every accepted unsupported image must be inspected. The candidate remains
 `production_approved: false` until field and realistic OOD criteria are defined,
 measured, reviewed, and recorded.
+
+The predefined OOD gate requires at least 500 source-documented images and no
+more than 1% false acceptance under the full production quality-plus-confidence
+decision. Suite composition and all accepted examples must also be reviewed.
