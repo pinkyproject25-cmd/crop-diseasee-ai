@@ -97,4 +97,6 @@ invent a crop or disease prediction, which remains the intended behavior.
 - Training-readiness milestone commit: `684ad9593a6c2eb5e4cf9164488c887b4ca40c06`.
 - Leakage-free custom split correction: `01da124048f59ff55b3ee1fb7b2de1765ebf1e76`.
 - Temperature-calibration fix: `54e8c7d9b2d7fcfe601fab3b9c54affa8711bb67`.
+- PlantDoc field-gate evidence and candidate-v1 rejection:
+  `ed1682e75853f6c180b16ee517ba7b17f10956d3`.
 - Detailed progress: `docs/PARALLEL_PROGRESS.md`.
