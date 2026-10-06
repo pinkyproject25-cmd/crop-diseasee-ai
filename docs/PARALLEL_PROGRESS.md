@@ -140,3 +140,5 @@ Updated: 2026-10-06 (Asia/Kolkata)
 - Temperature-calibration fix: `54e8c7d9b2d7fcfe601fab3b9c54affa8711bb67`.
 - PlantDoc field-gate evidence and candidate-v1 rejection:
   `ed1682e75853f6c180b16ee517ba7b17f10956d3`.
+- Candidate-v2 PlantDoc integrity audit:
+  `1fb6e3b923fe9d80e073dc5c100dd2bc2634775e`.
