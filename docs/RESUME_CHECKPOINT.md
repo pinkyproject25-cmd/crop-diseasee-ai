@@ -1,6 +1,6 @@
 # Crop Disease AI Parallel — Resume Checkpoint
 
-Saved: 2026-10-06 (Asia/Kolkata)
+Saved: 2026-10-07 (Asia/Kolkata)
 
 Writable repository: **pinkyproject25-cmd/crop-diseasee-ai only**
 
@@ -69,6 +69,27 @@ Never use the original project's repository, Colab notebook, Vercel project, Ren
   fixed mixed-domain experiment. The deterministic PlantDoc partitions are
   1,822 train, 228 internal validation, and 228 calibration images across 2,251
   non-overlapping perceptual groups. PlantDoc test is never read.
+- Completed Candidate-v2 preflight in the actual Colab environment. The frozen
+  split contains 1,824 train, 229 internal-validation, and 225 calibration
+  images; its split-manifest SHA-256 is
+  `79ed02756fe703cb8031dd7a47be0affa6793737ce1adcd1edabd1fa6ef174fc`.
+- Completed all eight fixed Candidate-v2 mixed-domain epochs. Epoch 8 had the
+  highest predefined selection score (`0.7832528432`). PlantVillage validation
+  macro-F1 was `0.9885254158`; PlantDoc internal-validation macro-F1 was
+  `0.5779802706`.
+- Verified Candidate-v2 ONNX parity on eight examples (8/8 top-1 agreement,
+  maximum absolute logit error `1.7643e-05`). The uploaded metrics file matches
+  the manifest SHA-256
+  `82175598c6c89f05541424960a23ce5b4c64aeb96a9b2ae810df6e793092abd5`.
+- Evaluated Candidate-v2 on all 236 images in the pinned PlantDoc test split as
+  a comparative benchmark. Accuracy improved from Candidate-v1's 25.42% to
+  57.20%, and macro-F1 improved from 24.61% to 56.30%.
+- Candidate-v2 still failed the predefined field gate at its fixed 0.845
+  threshold: 36.02% coverage, 85.88% accepted accuracy (73/85), and 76.93%
+  accepted-accuracy Wilson lower bound. Twelve incorrect predictions were
+  accepted. `production_approved` remains false.
+- Recorded the full scientific interpretation and controlled B.Tech prototype
+  recommendation in `docs/CANDIDATE_V2_EVALUATION.md`.
 
 ## Current parallel behavior
 
@@ -92,18 +113,14 @@ invent a crop or disease prediction, which remains the intended behavior.
 
 ## Remaining work
 
-1. Pull the latest parallel commit in the existing CPU runtime and run the
-   documented Candidate-v2 `--preflight-only` command.
-2. If and only if preflight passes, switch to a T4 and run the same fixed
-   command without `--preflight-only`; the Drive checkpoint supports resume.
-3. Review Candidate-v2 evidence, then evaluate a source-documented realistic
-   unsupported/non-leaf suite and a different untouched field dataset.
-4. Keep `production_approved` false and do not install candidate v1.
-5. Review the 36 controlled-test errors, especially visually similar tomato diseases, and gather more evidence for low-support classes such as potato healthy.
-6. Implement and validate disease-area/severity estimation.
-7. Complete and agriculturally review the symptoms, causes, and recommendations knowledge base.
-8. Complete working English, Telugu, and Hindi translation and speech.
-9. Create isolated Vercel and Render resources only after a scientific candidate is approved; install only an approved model and run full end-to-end verification.
+1. Keep Candidate-v2 `production_approved: false`; do not install it as a production model.
+2. Decide whether to add an explicitly opt-in, visibly labelled academic-demo mode. Such a mode must preserve quality checks, the fixed rejection threshold, Unknown/Undefined responses, and the field-performance disclosure.
+3. Evaluate a source-documented realistic unsupported/non-leaf suite and a different untouched field dataset before any production claim.
+4. Improve and re-evaluate weak field classes, especially confusing corn, potato, pepper, and tomato diseases, using additional audited data rather than test-set tuning.
+5. Implement and separately validate disease-area/severity estimation.
+6. Complete agricultural review of the symptoms, causes, and recommendations knowledge base.
+7. Complete working English, Telugu, and Hindi translation and speech.
+8. Create isolated Vercel and Render resources only after the intended academic-demo or production policy is explicitly selected; never reuse original-project resources.
 
 ## Integrity rules
 
@@ -126,4 +143,6 @@ invent a crop or disease prediction, which remains the intended behavior.
   `85d2a36b241ebe377185d381ed4b6c76bd784062`.
 - Fixed Candidate-v2 mixed-domain trainer:
   `3979260d98e9de44f55a6f3a36855f70d2f1e697`.
+- Candidate-v2 evaluation evidence: documentation commit
+  `bff5e5213783545c5e7e4ae155e33c25aadbe19a`.
 - Detailed progress: `docs/PARALLEL_PROGRESS.md`.
