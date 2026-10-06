@@ -64,6 +64,13 @@ Updated: 2026-10-06 (Asia/Kolkata)
 - The uploaded `metrics.json` SHA-256 matches its candidate manifest. The ONNX
   and labels hashes remain recorded in the manifest but were not independently
   re-hashed outside Colab.
+- Verified the official Cropped-PlantDoc repository, pinned revision
+  `5467f6012d78d1c446145d5f582da6096f852ae8`, and CC BY 4.0 license.
+- Added a candidate-integrity-checked field/OOD evaluator that reproduces the
+  backend's pixel preprocessing and quality gate, never uses filenames for
+  inference, refuses unmapped classes, and keeps the `0.99` threshold fixed.
+- Added an explicit mapping covering every class in PlantDoc's official test
+  split plus its train-only tomato spider-mite class.
 
 ## Deployment state
 
@@ -92,10 +99,9 @@ Updated: 2026-10-06 (Asia/Kolkata)
 
 ## Next actions
 
-1. Design and run a reproducible, license-reviewed field-image evaluation with
-   PlantDoc or another suitable dataset, including explicit class mapping and
-   unsupported-class handling.
-2. Build a realistic unsupported/non-leaf suite and measure threshold coverage,
+1. Run the pinned official PlantDoc test split with `evaluate_candidate.py` and
+   review all high-confidence errors before defining a pass/fail decision.
+2. Assemble a source-documented realistic unsupported/non-leaf suite and measure threshold coverage,
    accepted accuracy, false acceptance, and failure examples.
 3. Keep the candidate out of the backend until those gates pass; then review
    whether the threshold should remain `0.99` before any production approval.

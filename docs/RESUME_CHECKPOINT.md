@@ -35,6 +35,10 @@ Never use the original project's repository, Colab notebook, Vercel project, Ren
 - Verified reported ONNX parity on eight examples (8/8 top-1 agreement,
   maximum absolute logit error `3.8147e-05`) and matched the uploaded metrics
   file to the SHA-256 recorded in the candidate manifest.
+- Added `training/evaluate_candidate.py`, the pinned PlantDoc mapping, and
+  `docs/FIELD_EVALUATION.md` for the next external field/OOD gate. The evaluator
+  verifies candidate hashes, mirrors production preprocessing/quality checks,
+  and fixes the acceptance threshold before examining field results.
 
 ## Current parallel behavior
 
@@ -55,7 +59,7 @@ The parallel application is not deployed. No diagnostic model has been approved 
 
 ## Remaining work
 
-1. Evaluate field-image behavior with a license-reviewed PlantDoc/PlantSeg-style dataset and unsupported/non-leaf images.
+1. Run and review the pinned official PlantDoc test evaluation, then evaluate a source-documented realistic unsupported/non-leaf suite.
 2. Review the 36 controlled-test errors, especially visually similar tomato diseases, and gather more evidence for low-support classes such as potato healthy.
 3. Keep `production_approved` false until all gates pass; do not install a candidate merely because controlled PlantVillage metrics are high.
 4. Implement and validate disease-area/severity estimation.

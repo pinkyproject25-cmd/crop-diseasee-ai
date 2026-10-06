@@ -29,3 +29,7 @@ Dataset sources used by the validation plan:
 - PlantVillage: 14 crops, 38 healthy/disease classes, leaf-group metadata.
 - PlantDoc: independent field photographs for external classification evaluation where labels can be mapped safely.
 - PlantSeg: in-the-wild lesion masks for the separate severity pipeline.
+
+The next gate is implemented by `evaluate_candidate.py`. See
+`docs/FIELD_EVALUATION.md` for the pinned PlantDoc test procedure, explicit class
+mapping, artifact-integrity checks, and realistic unsupported-image workflow.
