@@ -40,3 +40,18 @@ decoding and mappings, detects exact pixel duplicates and train/test leakage,
 flags perceptual near-duplicates, and writes a reviewable training manifest.
 See `docs/CANDIDATE_V2.md` for the CPU-only Colab procedure. The generated clean
 manifest is not approved for training until its review artifacts are examined.
+
+After review, `finalize_plantdoc_manifest.py` produces the hash-pinned
+`reviewed_train_manifest.csv`. Candidate v2 uses a separate entry point:
+
+```bash
+python training/train_classifier_v2.py --help
+```
+
+Run its documented `--preflight-only` command on CPU before allocating a GPU.
+The preflight validates every PlantDoc source-file hash, the Candidate-v1
+initialization inputs, and deterministic perceptual-group splits. The fixed
+experiment uses 1,822 reviewed PlantDoc training images, 228 internal
+model-selection images, and 228 calibration images. It never reads PlantDoc
+test. Candidate-v2 artifacts remain non-production and require a different
+untouched field-photo gate.

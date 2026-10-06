@@ -54,6 +54,19 @@ Updated: 2026-10-06 (Asia/Kolkata)
 - Added a hash-pinned manifest finalizer that refuses changed audit evidence,
   enforces train-only/unique clean rows, applies the reviewed quarantine, and
   records `production_approved: false` in its review evidence.
+- Verified the persisted finalization evidence uploaded from Drive. The
+  reviewed manifest hash is
+  `66e8326295550f5e8453182dbf0bfcddf7af7d06a3a8e9954c3e5f9322ee2b62`,
+  with 2,278 rows and `training_authorized: true` only for Candidate-v2
+  experimentation.
+- Implemented the fixed Candidate-v2 mixed-domain trainer. Its deterministic
+  PlantDoc split contains 2,251 perceptual groups: 1,822 training images, 228
+  model-selection validation images, and 228 calibration images with no group
+  overlap. PlantDoc test is never read.
+- Fixed the run before observing Candidate-v2 results: Candidate-v1 weight
+  initialization, 8 full-network epochs, batch size 64, learning rate `1e-4`,
+  25% field-domain sampling, equal-domain validation selection/calibration,
+  and predefined controlled/field-calibration/OOD threshold constraints.
 
 ## Verification
 
@@ -143,15 +156,16 @@ Updated: 2026-10-06 (Asia/Kolkata)
 
 ## Next actions
 
-1. Run the committed finalizer against the Drive-backed audit evidence and
-   retain `reviewed_train_manifest.csv` plus `manifest_review.json`.
-2. Implement and run the predefined mixed-domain Candidate-v2 training recipe;
-   keep PlantDoc test excluded from training, model selection, and calibration.
-3. Refit calibration and rejection using only candidate-v2 calibration data;
-   do not tune against the consumed PlantDoc test results.
+1. Run the Candidate-v2 CPU preflight and verify the pinned inputs, source-file
+   hashes, initial Candidate-v1 weights, and deterministic split evidence.
+2. Only after preflight passes, use a T4 to run the fixed eight-epoch recipe;
+   keep PlantDoc test excluded from training, selection, and calibration.
+3. Review Candidate-v2 controlled regression, internal field validation,
+   calibration, threshold, and ONNX parity evidence without approving it.
 4. Assemble a source-documented realistic unsupported/non-leaf suite and
    measure false acceptance under the separately predefined OOD gate.
-5. Keep every candidate out of the backend until both independent field and
+5. Acquire a different licensed, untouched field-photo set for the approval
+   gate, then keep every candidate out of the backend until both field and
    realistic OOD gates pass.
 
 ## Relevant commit

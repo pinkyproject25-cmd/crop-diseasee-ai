@@ -27,6 +27,10 @@
   2,322 clean training rows. Manual review conservatively quarantined 44 more
   rows implicated in cross-split or conflicting-label near duplicates, leaving
   2,278 reviewed field-training images for Candidate-v2 experimentation.
+- Candidate-v2 training is implemented with hash-checked inputs, fixed
+  mixed-domain sampling, perceptual-group-safe PlantDoc partitions, resumable
+  checkpoints, balanced-domain calibration, and explicit non-production
+  outputs. Its CPU preflight must pass before GPU training begins.
 
 ## Scientific gates before the application can claim real production analysis
 

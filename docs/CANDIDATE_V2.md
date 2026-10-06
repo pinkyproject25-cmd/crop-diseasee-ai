@@ -115,8 +115,68 @@ instead of silently producing a different dataset.
 - The model remains `production_approved: false` until both field and realistic
   unsupported-image gates pass.
 
-The next code milestone is a mixed-domain Candidate-v2 trainer using the 2,278
-reviewed PlantDoc training images together with PlantVillage training data.
-Model selection and calibration must remain independent of the consumed
-PlantDoc test split. The GPU configuration and epoch schedule will be committed
-before Candidate-v2 training begins.
+## Stage 2: fixed mixed-domain experiment
+
+`training/train_classifier_v2.py` fixes the experiment before any Candidate-v2
+results are viewed:
+
+- initialize from Candidate v1 `best_model.pt`, recording its SHA-256;
+- train the full MobileNetV3 Small network for 8 epochs;
+- use batch size 64, learning rate `1e-4`, weight decay `1e-4`, and seed 7386;
+- sample 75% PlantVillage and 25% reviewed PlantDoc images per epoch;
+- keep PlantVillage leaf groups separated with the existing locked folds;
+- connect PlantDoc images with dHash distance at most 4 into indivisible groups;
+- split PlantDoc into 1,822 training, 228 model-selection validation, and 228
+  calibration images with no perceptual-group overlap;
+- select the checkpoint by the equal mean of PlantVillage and PlantDoc
+  validation macro-F1, retaining Candidate v1 as an epoch-zero baseline;
+- fit one temperature with equal NLL weight for the two calibration domains;
+  and
+- export an ONNX candidate that remains `production_approved: false`.
+
+PlantDoc has only two reviewed examples for its mapped tomato spider-mite
+class. Both remain in training, so the PlantDoc validation and calibration
+splits each cover 27 of 28 mapped classes. The trainer records this limitation;
+it does not fabricate support.
+
+The PlantVillage fold previously called the independent test fold was already
+reported for Candidate v1. Candidate v2 therefore treats it only as a locked
+controlled regression benchmark, not as a new untouched test set.
+
+The provisional threshold constraints are also fixed before training:
+
+- PlantVillage calibration coverage at least 50% and accepted accuracy at
+  least 95%;
+- PlantDoc calibration coverage at least 30%, accepted accuracy at least 95%,
+  and 95% Wilson lower bound at least 90%; and
+- CIFAR-100 false acceptance at most 1%.
+
+Passing those constraints still cannot approve Candidate v2. A different
+licensed, untouched field-photo dataset and a realistic agricultural OOD suite
+remain mandatory.
+
+### CPU preflight
+
+Run this before switching to a T4. It verifies every reviewed PlantDoc file
+hash, Candidate-v1 inputs, the pinned dataset revision, and all split groups.
+It performs no training.
+
+```bash
+cd /content/crop-diseasee-ai-parallel
+git pull --ff-only origin main
+pip install -q -r training/requirements.txt
+
+python training/train_classifier_v2.py \
+  --output-dir /content/drive/MyDrive/CropDiseaseAIParallel/classifier_candidate_v2 \
+  --plantdoc-root /content/PlantDoc-Dataset \
+  --plantdoc-manifest /content/drive/MyDrive/CropDiseaseAIParallel/plantdoc_audit_v1/reviewed_train_manifest.csv \
+  --plantdoc-review /content/drive/MyDrive/CropDiseaseAIParallel/plantdoc_audit_v1/manifest_review.json \
+  --initial-checkpoint /content/drive/MyDrive/CropDiseaseAIParallel/classifier_candidate_v1/best_model.pt \
+  --initial-labels /content/drive/MyDrive/CropDiseaseAIParallel/classifier_candidate_v1/labels.json \
+  --initial-candidate-manifest /content/drive/MyDrive/CropDiseaseAIParallel/classifier_candidate_v1/candidate_manifest.json \
+  --preflight-only
+```
+
+The expected preflight split is 2,278 rows in 2,251 perceptual groups: 1,822
+training, 228 validation, and 228 calibration. Keep the generated
+`input_preflight.json` and `plantdoc_candidate_v2_splits.csv` in Drive.

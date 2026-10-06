@@ -62,6 +62,13 @@ Never use the original project's repository, Colab notebook, Vercel project, Ren
 - Added `training/finalize_plantdoc_manifest.py` and the hash-pinned manual
   quarantine decision. The finalizer validates the uploaded evidence and keeps
   `production_approved` false.
+- Verified the Drive-generated `manifest_review.json`; the reviewed manifest
+  contains 2,278 rows and matches SHA-256
+  `66e8326295550f5e8453182dbf0bfcddf7af7d06a3a8e9954c3e5f9322ee2b62`.
+- Implemented `training/train_classifier_v2.py` with a CPU preflight and a
+  fixed mixed-domain experiment. The deterministic PlantDoc partitions are
+  1,822 train, 228 internal validation, and 228 calibration images across 2,251
+  non-overlapping perceptual groups. PlantDoc test is never read.
 
 ## Current parallel behavior
 
@@ -86,11 +93,11 @@ invent a crop or disease prediction, which remains the intended behavior.
 ## Remaining work
 
 1. Pull the latest parallel commit in the existing CPU runtime and run the
-   manifest finalizer against `plantdoc_audit_v1`; retain its two output files.
-2. Implement and run a fixed mixed-domain Candidate-v2 recipe using the
-   reviewed PlantDoc train manifest and leakage-controlled PlantVillage data.
-3. Recalibrate candidate v2 without tuning on the now-consumed PlantDoc test
-   split, then evaluate a source-documented realistic unsupported/non-leaf suite.
+   documented Candidate-v2 `--preflight-only` command.
+2. If and only if preflight passes, switch to a T4 and run the same fixed
+   command without `--preflight-only`; the Drive checkpoint supports resume.
+3. Review Candidate-v2 evidence, then evaluate a source-documented realistic
+   unsupported/non-leaf suite and a different untouched field dataset.
 4. Keep `production_approved` false and do not install candidate v1.
 5. Review the 36 controlled-test errors, especially visually similar tomato diseases, and gather more evidence for low-support classes such as potato healthy.
 6. Implement and validate disease-area/severity estimation.
