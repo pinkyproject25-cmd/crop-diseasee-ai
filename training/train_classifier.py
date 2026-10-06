@@ -234,8 +234,11 @@ def train_epoch(
     return total_loss / len(loader.dataset)
 
 
-@torch.inference_mode()
+@torch.no_grad()
 def collect_logits(model: nn.Module, loader: DataLoader, device: torch.device) -> tuple[Tensor, Tensor]:
+    # Calibration optimizes a temperature parameter against these logits.
+    # Tensors created in inference mode cannot later be used in an autograd
+    # graph, even when the logits themselves are treated as constants.
     model.eval()
     logits: list[Tensor] = []
     labels: list[Tensor] = []
