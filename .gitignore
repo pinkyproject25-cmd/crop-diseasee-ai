@@ -1,0 +1,31 @@
+node_modules/
+dist/
+site-deploy.tgz
+.openai/
+
+# Local environment and Python state
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# TypeScript/Vite build artifacts
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+
+# Trained model binaries are produced by the reviewed training pipeline.
+# Keep deployment artifacts out of Git until evaluation is complete.
+backend/models/*.onnx
+backend/models/*.pt
+backend/models/*.pth
+backend/models/*.keras
+backend/models/*.h5
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/

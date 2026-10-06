@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: crop-disease-ai-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: MODEL_PATH
+        value: models/crop_classifier.onnx
+      - key: LABELS_PATH
+        value: models/labels.json
+      - key: MODEL_VERSION
+        value: not-configured
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: AZURE_SPEECH_KEY
+        sync: false
+      - key: AZURE_SPEECH_REGION
+        sync: false
+      - key: AZURE_TRANSLATOR_KEY
+        sync: false
+      - key: AZURE_TRANSLATOR_REGION
+        sync: false
