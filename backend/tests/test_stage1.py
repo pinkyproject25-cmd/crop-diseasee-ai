@@ -15,6 +15,10 @@ from app.model import classifier
 
 
 FIXTURE_DIR = Path(os.environ.get("STAGE1_FIXTURE_DIR", ""))
+FIXTURES_AVAILABLE = all(
+    (FIXTURE_DIR / filename).is_file()
+    for filename in ("diseased-apple-scab.jpg", "healthy-grape.jpg", "low-confidence.jpg")
+)
 
 
 def image_bytes(path: Path) -> bytes:
@@ -43,7 +47,7 @@ class FrontendBackendContractTests(unittest.TestCase):
         self.assertEqual(backend_fields - frontend_fields, set())
 
 
-@unittest.skipUnless(FIXTURE_DIR.is_dir(), "set STAGE1_FIXTURE_DIR to the pinned PlantDoc fixtures")
+@unittest.skipUnless(FIXTURES_AVAILABLE, "set STAGE1_FIXTURE_DIR to the pinned PlantDoc fixtures")
 class CandidateV2HttpTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
