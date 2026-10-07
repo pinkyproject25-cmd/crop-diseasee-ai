@@ -52,6 +52,7 @@ import {
 } from "./lib/storage";
 import { cropCoverage } from "./data/crops";
 import type { AnalysisReport, Language } from "./types";
+import LeafMarker from "./LeafMarker";
 
 const nav = [
   { to: "/", label: "Home", icon: Leaf },
@@ -312,7 +313,7 @@ function readablePredictionLabel(label: string): string {
 
 function ResultPage() {
   const navigate = useNavigate();
-  const [baseReport] = useState(getActiveReport);
+  const [baseReport, setBaseReport] = useState(getActiveReport);
   const [report, setReport] = useState(baseReport);
   const [language, setLanguage] = useState<Language>("en");
   const [languageError, setLanguageError] = useState("");
@@ -347,7 +348,8 @@ function ResultPage() {
     setLanguage(next);
     setLanguageError("");
     try {
-      setReport(next === "en" ? baseReport : await translateReport(baseReport, next));
+      const translated = next === "en" ? baseReport : await translateReport(baseReport, next);
+      setReport({ ...translated, measurementSource: baseReport.measurementSource });
     } catch (caught) {
       setReport(baseReport);
       setLanguage("en");
@@ -380,6 +382,24 @@ function ResultPage() {
 
   const unknown = report.state === "unknown";
   const healthy = report.state === "healthy";
+  const assisted = report.measurementSource === "user_assisted";
+  const applyMarkedArea = (percent: number) => {
+    if (!baseReport) return;
+    const updated: AnalysisReport = {
+      ...baseReport,
+      diseaseRate: percent,
+      severity: percent < 10 ? "Low" : percent < 30 ? "Medium" : "High",
+      healthScore: Math.round((100 - percent) * 10) / 10,
+      observedSymptoms: ["Visible affected patches were marked by the user in this photo."],
+      measurementSource: "user_assisted",
+      language: "en",
+    };
+    stopAudio();
+    saveReport(updated);
+    setBaseReport(updated);
+    setReport(updated);
+    setLanguage("en");
+  };
   const stateTitle = unknown ? "Analysis uncertain" : healthy ? "No supported disease detected" : report.disease || "Disease detected";
   const confidenceValue = report.confidence === null ? "Undefined" : `${Math.round(report.confidence * 100)}%`;
   const predictionData = report.topPredictions.map((item) => ({
@@ -422,14 +442,18 @@ function ResultPage() {
         {report.thumbnailDataUrl && <img src={report.thumbnailDataUrl} alt="Analyzed leaf" />}
       </div>
 
+      {report.state === "diseased" && baseReport.thumbnailDataUrl && (
+        <LeafMarker imageUrl={baseReport.thumbnailDataUrl} onMeasured={applyMarkedArea} />
+      )}
+
       <div className="metrics-grid">
         <MetricCard label="Crop" value={report.crop || "Undefined"} helper="Visual crop prediction" />
         <MetricCard label="AI confidence" value={confidenceValue} helper="Calibrated model confidence" tone="blue" />
-        <MetricCard label="Visible affected area" value={healthy ? "None" : report.diseaseRate === null ? (unknown ? "Undefined" : "Unable to estimate") : `${report.diseaseRate}%`} helper="Experimental discoloration estimate; visible leaf only" tone="amber" />
+        <MetricCard label="Visible affected area" value={healthy ? "None" : report.diseaseRate === null ? (unknown ? "Undefined" : "Unable to estimate") : `${report.diseaseRate}%`} helper={assisted ? "User-assisted: marked pixels within outlined leaf" : "Experimental discoloration estimate; visible leaf only"} tone="amber" />
         <MetricCard label="Visual severity" value={healthy ? "None" : report.severity || (unknown ? "Undefined" : "Unable to estimate")} helper="Prototype bands: below 10% Low, below 30% Medium, otherwise High" tone="rose" />
       </div>
 
-      {report.diseaseRate !== null && <p>Experimental visual estimate for a single leaf on a plain light background. Discoloration is not proof of disease and the score does not describe the entire plant.</p>}
+      {report.diseaseRate !== null && <p>{assisted ? "User-assisted visual estimate from your leaf outline and marked affected patches." : "Experimental colour estimate for an isolated leaf on a plain light background."} This does not prove disease or describe the entire plant.</p>}
       {!unknown && (
         <>
           <div className="report-grid">
@@ -467,7 +491,7 @@ function ResultPage() {
             <article className="chart-card status-visual">
               <h3>Visible leaf health</h3>
               {report.healthScore === null ? (
-                <div className="not-measured"><Gauge /><strong>Unable to estimate</strong><p>A clear isolated leaf on a plain light background is needed for the experimental estimate.</p></div>
+                <div className="not-measured"><Gauge /><strong>Unable to estimate</strong><p>For a field photo, use “Mark visible affected area” above. The automatic estimate requires a clear isolated leaf on a plain light background.</p></div>
               ) : (
                 <div className="score-ring" style={{ "--score": report.healthScore } as React.CSSProperties}>
                   <span>{report.healthScore}%</span><small>estimated visually unaffected area</small>
