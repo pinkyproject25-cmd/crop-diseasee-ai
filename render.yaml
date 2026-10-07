@@ -13,8 +13,18 @@ services:
         value: models/crop_classifier.onnx
       - key: LABELS_PATH
         value: models/labels.json
+      - key: MODEL_MANIFEST_PATH
+        value: models/candidate_manifest.json
       - key: MODEL_VERSION
-        value: not-configured
+        value: mixed-pv-plantdoc-mnv3-20261006T194137Z
+      - key: MODEL_SHA256
+        value: 864dd9f77c01e6b4f77acfc1e0446b49c39855f31d5aed65c0d2a9a3b9ad4bb7
+      - key: LABELS_SHA256
+        value: 16925c0cb74cd5be219eb9e8cf87f0fa4f5c255f49b8db7c865c55050cb7d307
+      - key: MODEL_MANIFEST_SHA256
+        value: 357efbe591ca6e960acb5bf79e1211d164ec63bbfbd10244be40924db84d8c15
+      - key: ACCEPTANCE_THRESHOLD
+        value: "0.845"
       - key: ALLOWED_ORIGINS
         sync: false
       - key: AZURE_SPEECH_KEY

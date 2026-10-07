@@ -20,6 +20,7 @@ export interface AnalysisReport {
   id: string;
   createdAt: string;
   modelVersion: string;
+  modelStatus: "experimental";
   state: AnalysisState;
   crop: string | null;
   disease: string | null;

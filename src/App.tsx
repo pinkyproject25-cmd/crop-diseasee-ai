@@ -301,9 +301,13 @@ function ListPanel({ title, items, icon: Icon }: { title: string; items: string[
   return (
     <article className="report-panel">
       <h3><Icon size={20} /> {title}</h3>
-      {items.length ? <ul>{items.map((item) => <li key={item}>{item}</li>)}</ul> : <p className="none-value">None</p>}
+      {items.length ? <ul>{items.map((item) => <li key={item}>{item}</li>)}</ul> : <p className="none-value">Not available in this experimental classification.</p>}
     </article>
   );
+}
+
+function readablePredictionLabel(label: string): string {
+  return label.replace("___", " · ").replaceAll("_", " ").replaceAll("  ", " ").trim();
 }
 
 function ResultPage() {
@@ -378,7 +382,10 @@ function ResultPage() {
   const healthy = report.state === "healthy";
   const stateTitle = unknown ? "Analysis uncertain" : healthy ? "No supported disease detected" : report.disease || "Disease detected";
   const confidenceValue = report.confidence === null ? "Undefined" : `${Math.round(report.confidence * 100)}%`;
-  const predictionData = report.topPredictions.map((item) => ({ name: item.label, value: Math.round(item.probability * 100) }));
+  const predictionData = report.topPredictions.map((item) => ({
+    name: readablePredictionLabel(item.label),
+    value: Math.round(item.probability * 10_000) / 100,
+  }));
 
   return (
     <section className="result-section">
@@ -387,6 +394,7 @@ function ResultPage() {
           <span className="kicker">Analysis result</span>
           <h1>{stateTitle}</h1>
           <p>{new Date(report.createdAt).toLocaleString()} · Model {report.modelVersion}</p>
+          {report.modelStatus === "experimental" && <span className="experimental-badge">Experimental Candidate-v2 · not production approved</span>}
         </div>
         <button className="secondary-button" onClick={() => navigate("/")}><Camera size={19} /> Scan another leaf</button>
       </div>
@@ -418,7 +426,7 @@ function ResultPage() {
         <MetricCard label="Crop" value={report.crop || "Undefined"} helper="Visual crop prediction" />
         <MetricCard label="AI confidence" value={confidenceValue} helper="Calibrated model confidence" tone="blue" />
         <MetricCard label="Visible disease rate" value={report.diseaseRate === null ? (unknown ? "Undefined" : "Unable to estimate") : `${report.diseaseRate}%`} helper="Visible leaf area only" tone="amber" />
-        <MetricCard label="Severity" value={report.severity || (unknown ? "Undefined" : "None")} helper="Independent of confidence" tone="rose" />
+        <MetricCard label="Severity" value={report.severity || (unknown ? "Undefined" : "Unable to estimate")} helper="Requires a separate validated component" tone="rose" />
       </div>
 
       {!unknown && (

@@ -24,6 +24,9 @@ backend/models/*.pt
 backend/models/*.pth
 backend/models/*.keras
 backend/models/*.h5
+backend/models/labels.json
+backend/models/candidate_manifest.json
+backend/models/metrics.json
 
 # Editors and operating systems
 .DS_Store

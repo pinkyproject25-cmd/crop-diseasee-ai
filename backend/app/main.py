@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
 from .config import settings
+from .classification import parse_combined_label
 from .language import report_to_speech_text, synthesize_speech, translate_report
 from .model import InvalidImageError, ModelUnavailableError, classifier
 from .schemas import AnalysisReport, SpeechRequest, TranslateRequest
@@ -82,12 +83,21 @@ async def analyze(
             topPredictions=output.predictions, weather=weather,
         )
 
-    raise HTTPException(
-        status_code=503,
-        detail=(
-            "The classifier returned a supported candidate, but the reviewed disease-information "
-            "and severity layers are not installed. No complete report was generated."
-        ),
+    try:
+        classification = parse_combined_label(top.label)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="The classifier produced an invalid class label. No report was generated.",
+        ) from exc
+
+    return AnalysisReport(
+        id=str(uuid4()), createdAt=now, modelVersion=settings.model_version,
+        state=classification.state, crop=classification.crop, disease=classification.disease,
+        condition=classification.condition, confidence=top.probability,
+        diseaseRate=None, severity=None, healthScore=None,
+        observedSymptoms=[], typicalSymptoms=[], causes=[], recommendations=[],
+        uncertaintyReason=None, topPredictions=output.predictions, weather=weather,
     )
 
 

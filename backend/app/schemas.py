@@ -25,6 +25,7 @@ class AnalysisReport(BaseModel):
     id: str
     createdAt: datetime
     modelVersion: str
+    modelStatus: Literal["experimental"] = "experimental"
     state: Literal["healthy", "diseased", "unknown"]
     crop: str | None
     disease: str | None
