@@ -425,10 +425,11 @@ function ResultPage() {
       <div className="metrics-grid">
         <MetricCard label="Crop" value={report.crop || "Undefined"} helper="Visual crop prediction" />
         <MetricCard label="AI confidence" value={confidenceValue} helper="Calibrated model confidence" tone="blue" />
-        <MetricCard label="Visible disease rate" value={report.diseaseRate === null ? (unknown ? "Undefined" : "Unable to estimate") : `${report.diseaseRate}%`} helper="Visible leaf area only" tone="amber" />
-        <MetricCard label="Severity" value={report.severity || (unknown ? "Undefined" : "Unable to estimate")} helper="Requires a separate validated component" tone="rose" />
+        <MetricCard label="Visible affected area" value={healthy ? "None" : report.diseaseRate === null ? (unknown ? "Undefined" : "Unable to estimate") : `${report.diseaseRate}%`} helper="Experimental discoloration estimate; visible leaf only" tone="amber" />
+        <MetricCard label="Visual severity" value={healthy ? "None" : report.severity || (unknown ? "Undefined" : "Unable to estimate")} helper="Prototype bands: below 10% Low, below 30% Medium, otherwise High" tone="rose" />
       </div>
 
+      {report.diseaseRate !== null && <p>Experimental visual estimate for a single leaf on a plain light background. Discoloration is not proof of disease and the score does not describe the entire plant.</p>}
       {!unknown && (
         <>
           <div className="report-grid">
@@ -466,10 +467,10 @@ function ResultPage() {
             <article className="chart-card status-visual">
               <h3>Visible leaf health</h3>
               {report.healthScore === null ? (
-                <div className="not-measured"><Gauge /><strong>Unable to estimate</strong><p>A validated leaf-area measurement was not available for this result.</p></div>
+                <div className="not-measured"><Gauge /><strong>Unable to estimate</strong><p>A clear isolated leaf on a plain light background is needed for the experimental estimate.</p></div>
               ) : (
                 <div className="score-ring" style={{ "--score": report.healthScore } as React.CSSProperties}>
-                  <span>{report.healthScore}%</span><small>visibly unaffected area</small>
+                  <span>{report.healthScore}%</span><small>estimated visually unaffected area</small>
                 </div>
               )}
             </article>
@@ -540,7 +541,7 @@ function DashboardPage() {
             <div className="legend">{chartData.map((item) => <span key={item.name}><i style={{ background: item.color }} />{item.name}: {item.value}</span>)}</div>
           </article>
           <article className="chart-card">
-            <h3>Measured visible health</h3><p>Reports without a valid score are excluded.</p>
+            <h3>Estimated visible leaf health</h3><p>Experimental estimates from clear single-leaf images only.</p>
             {measured.length ? (
               <div className="chart-wrap">
                 <ResponsiveContainer width="100%" height="100%">

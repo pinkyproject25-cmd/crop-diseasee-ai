@@ -13,6 +13,7 @@ from .language import report_to_speech_text, synthesize_speech, translate_report
 from .model import InvalidImageError, ModelUnavailableError, classifier
 from .schemas import AnalysisReport, SpeechRequest, TranslateRequest
 from .weather import fetch_weather
+from .visual_area import estimate_visible_area
 
 
 @asynccontextmanager
@@ -93,15 +94,23 @@ async def analyze(
         ) from exc
 
     knowledge = get_knowledge(top.label) if classification.state == "diseased" else None
+    visual = estimate_visible_area(image_bytes) if classification.state == "diseased" else None
+    healthy_care = [
+        "Inspect the plant regularly for changes to its leaves and growth.",
+        "Provide crop-appropriate watering and avoid leaving foliage wet unnecessarily.",
+        "Ask a local agricultural adviser about care suited to this crop and your region.",
+    ] if classification.state == "healthy" else []
     return AnalysisReport(
         id=str(uuid4()), createdAt=now, modelVersion=settings.model_version,
         state=classification.state, crop=classification.crop, disease=classification.disease,
         condition=classification.condition, confidence=top.probability,
-        diseaseRate=None, severity=None, healthScore=None,
-        observedSymptoms=[],
+        diseaseRate=visual.affected_percent if visual else None,
+        severity=visual.severity if visual else None,
+        healthScore=visual.visible_health_percent if visual else None,
+        observedSymptoms=visual.observations if visual else [],
         typicalSymptoms=list(knowledge.typical_symptoms) if knowledge else [],
         causes=list(knowledge.causes) if knowledge else [],
-        recommendations=list(knowledge.recommendations) if knowledge else [],
+        recommendations=list(knowledge.recommendations) if knowledge else healthy_care,
         knowledgeSources=[{"title": knowledge.source_title, "url": knowledge.source_url}] if knowledge else [],
         uncertaintyReason=None, topPredictions=output.predictions, weather=weather,
     )
