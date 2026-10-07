@@ -181,3 +181,17 @@ Updated: 2026-10-06 (Asia/Kolkata)
   `85d2a36b241ebe377185d381ed4b6c76bd784062`.
 - Fixed Candidate-v2 mixed-domain trainer:
   `3979260d98e9de44f55a6f3a36855f70d2f1e697`.
+
+## Stage 1 academic-prototype integration (2026-10-07 UTC)
+
+- Verified the private Candidate-v2 ONNX, ordered labels, manifest, and metrics
+  against their recorded SHA-256 values.
+- Added fail-closed runtime provenance checks and fixed threshold `0.845`; the
+  ONNX already embeds temperature scaling, so the backend does not apply it again.
+- Implemented genuine accepted healthy/diseased reports with original top-five
+  probabilities. All unavailable measurement and knowledge fields remain empty/null.
+- Passed nine backend/contract tests on pinned licensed field images, including
+  low-confidence, blur, renamed-file, and model-unavailable paths.
+- TypeScript checking and the frontend production build pass. No deployment was made.
+- Implementation commit: `c973ec081ae4b301989ae4cecc9306422daf1082`.
+- Full evidence: `docs/STAGE1_PROTOTYPE_CHECKPOINT.md`.

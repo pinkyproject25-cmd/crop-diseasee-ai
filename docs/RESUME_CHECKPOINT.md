@@ -93,10 +93,13 @@ Never use the original project's repository, Colab notebook, Vercel project, Ren
 
 ## Current parallel behavior
 
-The parallel application is not deployed. Candidate v1 is explicitly rejected
-for backend integration after failing the independent field gate. No diagnostic
-model has been approved or installed. The local API deliberately refuses to
-invent a crop or disease prediction, which remains the intended behavior.
+The parallel application is not deployed. The exact hash-pinned Candidate-v2
+can now be installed locally for a visibly labelled academic-prototype mode.
+Accepted images return genuine classifier output; uncertain/poor-quality images
+return Unknown, missing artifacts return 503, and unimplemented severity,
+affected-area, health-score, symptoms, causes, and recommendations remain
+unavailable. Candidate-v2 is not production approved. See
+`docs/STAGE1_PROTOTYPE_CHECKPOINT.md`.
 
 ## Parallel Colab state
 
@@ -114,7 +117,7 @@ invent a crop or disease prediction, which remains the intended behavior.
 ## Remaining work
 
 1. Keep Candidate-v2 `production_approved: false`; do not install it as a production model.
-2. Decide whether to add an explicitly opt-in, visibly labelled academic-demo mode. Such a mode must preserve quality checks, the fixed rejection threshold, Unknown/Undefined responses, and the field-performance disclosure.
+2. Preserve the completed visibly labelled academic-prototype mode, its fixed threshold, Unknown/Undefined behavior, and field-performance disclosure.
 3. Evaluate a source-documented realistic unsupported/non-leaf suite and a different untouched field dataset before any production claim.
 4. Improve and re-evaluate weak field classes, especially confusing corn, potato, pepper, and tomato diseases, using additional audited data rather than test-set tuning.
 5. Implement and separately validate disease-area/severity estimation.
@@ -145,4 +148,6 @@ invent a crop or disease prediction, which remains the intended behavior.
   `3979260d98e9de44f55a6f3a36855f70d2f1e697`.
 - Candidate-v2 evaluation evidence: documentation commit
   `bff5e5213783545c5e7e4ae155e33c25aadbe19a`.
+- Candidate-v2 Stage 1 academic-prototype integration:
+  `c973ec081ae4b301989ae4cecc9306422daf1082`.
 - Detailed progress: `docs/PARALLEL_PROGRESS.md`.

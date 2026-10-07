@@ -27,16 +27,16 @@
   2,322 clean training rows. Manual review conservatively quarantined 44 more
   rows implicated in cross-split or conflicting-label near duplicates, leaving
   2,278 reviewed field-training images for Candidate-v2 experimentation.
-- Candidate-v2 training is implemented with hash-checked inputs, fixed
-  mixed-domain sampling, perceptual-group-safe PlantDoc partitions, resumable
-  checkpoints, balanced-domain calibration, and explicit non-production
-  outputs. Its CPU preflight must pass before GPU training begins.
+- Candidate-v2 completed eight fixed mixed-domain epochs and comparative field
+  evaluation. It is suitable only for the visibly labelled academic prototype;
+  it failed the production field gate and remains `production_approved: false`.
+- Stage 1 locally integrates the exact hash-pinned Candidate-v2 artifacts,
+  fixed threshold `0.845`, genuine top-five probabilities, combined-label
+  parsing, Unknown/quality behavior, and an honest unavailable state for every
+  unimplemented measurement or knowledge field.
 
 ## Scientific gates before the application can claim real production analysis
 
-- Implement, train, and export a mixed-domain Candidate-v2 classifier using
-  only the reviewed PlantDoc training manifest plus leakage-controlled
-  PlantVillage training data.
 - Reconfirm class-wise performance on leakage-independent controlled and field
   splits; PlantDoc test is now a consumed benchmark, not a tuning set.
 - Pass a different untouched field-photo gate and a source-documented
@@ -48,8 +48,16 @@
 
 ## Current deliberate behavior
 
-When the model files are absent, the API returns HTTP 503 and states that no prediction was generated. When a candidate class is returned without the reviewed information and severity layers, the API also refuses to construct an incomplete disease report.
+When the model files are absent, mismatched, or corrupt, the API refuses to load
+them and returns HTTP 503 when unavailable. Below-threshold or poor-quality
+images return Unknown. Accepted Candidate-v2 results return only classifier-
+backed crop, condition, disease, confidence, and top-five values. Unimplemented
+measurements and agricultural content are explicitly unavailable, never inferred
+from confidence.
 
-This parallel instance has no Vercel project and no confirmed Render service. Model readiness remains false until the scientific gates above are completed. Future deployments must use new resources associated only with `pinkyproject25-cmd/crop-diseasee-ai`.
+This parallel instance has no Vercel project and no confirmed Render service.
+Academic-prototype classifier readiness is true only when the exact local
+artifacts are installed; production readiness remains false. Future deployments
+must use new resources associated only with `pinkyproject25-cmd/crop-diseasee-ai`.
 
 This behavior prevents the polished interface from being mistaken for a completed AI system.
