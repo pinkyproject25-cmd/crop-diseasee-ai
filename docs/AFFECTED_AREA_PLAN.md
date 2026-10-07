@@ -55,3 +55,20 @@ derived from classification confidence or automatically filled in.
 
 No affected-area model, severity rule, or health-score rule is approved yet.
 The Stage 1 API and UI correctly leave these fields unavailable.
+## Initial source audit (2026-10-07)
+
+- PlantSeg v7 (https://zenodo.org/records/17719108) provides diseased-region
+  annotations. Its record does not establish a usable whole-leaf mask or a
+  clearly stated license. Do not approve it for training yet.
+- CropAndWeedAndLeaf (https://zenodo.org/records/20116408) provides leaf-instance
+  masks, including maize, squash, potato, and soybean. The authors state
+  CC BY-NC-SA 4.0. It does not provide paired lesion masks.
+- PhenoBench (https://www.phenobench.org/dataset.html) provides leaf-instance
+  masks under CC BY-SA 4.0, but its sugar-beet UAV setting is a poor direct
+  match for uploaded photographs of this project's target crops.
+
+Decision: investigate CropAndWeedAndLeaf for leaf-mask training. Obtain
+properly licensed target-crop photographs with leaf AND lesion masks on the
+same images for affected-area evaluation. Separate datasets cannot be combined
+as if their masks describe the same photograph. Keep affected area, severity,
+and health score unavailable until measured validation passes.
