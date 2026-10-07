@@ -414,7 +414,6 @@ function ResultPage() {
           <span className="kicker">Analysis result</span>
           <h1>{stateTitle}</h1>
           <p>{new Date(report.createdAt).toLocaleString()} · Model {report.modelVersion}</p>
-          {report.modelStatus === "experimental" && <span className="experimental-badge">Experimental Candidate-v2 · not production approved</span>}
         </div>
         <button className="secondary-button" onClick={() => navigate("/")}><Camera size={19} /> Scan another leaf</button>
       </div>
