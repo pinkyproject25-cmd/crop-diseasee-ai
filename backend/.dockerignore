@@ -1,0 +1,5 @@
+.venv/
+__pycache__/
+models/*.onnx
+models/labels.json
+models/candidate_manifest.json

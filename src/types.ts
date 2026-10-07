@@ -33,6 +33,7 @@ export interface AnalysisReport {
   typicalSymptoms: string[];
   causes: string[];
   recommendations: string[];
+  knowledgeSources?: { title: string; url: string }[];
   uncertaintyReason: string | null;
   topPredictions: Prediction[];
   weather: WeatherSnapshot | null;

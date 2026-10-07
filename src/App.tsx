@@ -437,6 +437,15 @@ function ResultPage() {
             <ListPanel title="Known causes or contributors" items={healthy ? [] : report.causes} icon={TriangleAlert} />
             <ListPanel title={healthy ? "Crop-care recommendations" : "Recommended next steps"} items={report.recommendations} icon={CheckCircle2} />
           </div>
+          {!!report.knowledgeSources?.length && (
+            <div className="report-panel">
+              <h3><Info size={20} /> Reference sources</h3>
+              <p>General disease information for the predicted class; these are not symptoms verified in your photo. Check local guidance before acting.</p>
+              <ul>{report.knowledgeSources.map((source) => (
+                <li key={source.url}><a href={source.url} target="_blank" rel="noopener noreferrer">{source.title}</a></li>
+              ))}</ul>
+            </div>
+          )}
 
           <div className="visual-grid">
             <article className="chart-card">

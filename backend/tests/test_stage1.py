@@ -62,9 +62,6 @@ class CandidateV2HttpTests(unittest.TestCase):
         self.assertIsNone(report["severity"])
         self.assertIsNone(report["healthScore"])
         self.assertEqual(report["observedSymptoms"], [])
-        self.assertEqual(report["typicalSymptoms"], [])
-        self.assertEqual(report["causes"], [])
-        self.assertEqual(report["recommendations"], [])
 
     def test_accepted_diseased_report(self) -> None:
         response = self.analyze(image_bytes(FIXTURE_DIR / "diseased-apple-scab.jpg"))
@@ -77,6 +74,11 @@ class CandidateV2HttpTests(unittest.TestCase):
         self.assertEqual(len(report["topPredictions"]), 5)
         self.assertEqual(report["modelStatus"], "experimental")
         self.assert_missing_layers(report)
+        self.assertTrue(report["typicalSymptoms"])
+        self.assertTrue(report["causes"])
+        self.assertTrue(report["recommendations"])
+        self.assertEqual(report["knowledgeSources"][0]["url"],
+                         "https://ipm.ucanr.edu/agriculture/apple/apple-scab/")
 
     def test_accepted_healthy_report(self) -> None:
         response = self.analyze(image_bytes(FIXTURE_DIR / "healthy-grape.jpg"))
@@ -86,6 +88,10 @@ class CandidateV2HttpTests(unittest.TestCase):
                          ("healthy", "Grape", "Healthy", None))
         self.assertGreater(report["confidence"], 0.9999)
         self.assert_missing_layers(report)
+        self.assertEqual(report["typicalSymptoms"], [])
+        self.assertEqual(report["causes"], [])
+        self.assertEqual(report["recommendations"], [])
+        self.assertEqual(report["knowledgeSources"], [])
 
     def test_low_confidence_returns_unknown(self) -> None:
         response = self.analyze(image_bytes(FIXTURE_DIR / "low-confidence.jpg"))
@@ -94,6 +100,7 @@ class CandidateV2HttpTests(unittest.TestCase):
         self.assertEqual(report["state"], "unknown")
         self.assertLess(report["confidence"], 0.845)
         self.assertIn("confidence threshold", report["uncertaintyReason"])
+        self.assertEqual(report["knowledgeSources"], [])
 
     def test_blurred_image_returns_unknown(self) -> None:
         source = Image.open(FIXTURE_DIR / "healthy-grape.jpg").convert("RGB").resize((512, 320))

@@ -6,4 +6,5 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY models ./models
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+COPY install_candidate_v2.py fetch_model_artifacts.py ./
+CMD ["sh", "-c", "python fetch_model_artifacts.py && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
