@@ -8,6 +8,7 @@ from fastapi.responses import Response
 
 from .config import settings
 from .classification import parse_combined_label
+from .knowledge import get_knowledge
 from .language import report_to_speech_text, synthesize_speech, translate_report
 from .model import InvalidImageError, ModelUnavailableError, classifier
 from .schemas import AnalysisReport, SpeechRequest, TranslateRequest
@@ -91,12 +92,17 @@ async def analyze(
             detail="The classifier produced an invalid class label. No report was generated.",
         ) from exc
 
+    knowledge = get_knowledge(top.label) if classification.state == "diseased" else None
     return AnalysisReport(
         id=str(uuid4()), createdAt=now, modelVersion=settings.model_version,
         state=classification.state, crop=classification.crop, disease=classification.disease,
         condition=classification.condition, confidence=top.probability,
         diseaseRate=None, severity=None, healthScore=None,
-        observedSymptoms=[], typicalSymptoms=[], causes=[], recommendations=[],
+        observedSymptoms=[],
+        typicalSymptoms=list(knowledge.typical_symptoms) if knowledge else [],
+        causes=list(knowledge.causes) if knowledge else [],
+        recommendations=list(knowledge.recommendations) if knowledge else [],
+        knowledgeSources=[{"title": knowledge.source_title, "url": knowledge.source_url}] if knowledge else [],
         uncertaintyReason=None, topPredictions=output.predictions, weather=weather,
     )
 

@@ -21,6 +21,11 @@ class WeatherSnapshot(BaseModel):
     description: str
 
 
+class KnowledgeSource(BaseModel):
+    title: str
+    url: str
+
+
 class AnalysisReport(BaseModel):
     id: str
     createdAt: datetime
@@ -38,6 +43,7 @@ class AnalysisReport(BaseModel):
     typicalSymptoms: list[str]
     causes: list[str]
     recommendations: list[str]
+    knowledgeSources: list[KnowledgeSource] = Field(default_factory=list)
     uncertaintyReason: str | None
     topPredictions: list[Prediction]
     weather: WeatherSnapshot | None
