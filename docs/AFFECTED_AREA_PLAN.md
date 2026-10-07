@@ -28,10 +28,18 @@ non-binary/non-finite masks. This is arithmetic only; it does not infer masks.
 ## Dataset evidence checked on 2026-10-07
 
 - [PlantSeg v7](https://zenodo.org/records/17719108) supplies disease-region
-  masks. The accompanying Scientific Data paper states CC BY-NC 4.0, but the
-  Zenodo record displays no licence value. More importantly, PlantSeg does not
-  establish paired whole-leaf masks for the same images, so it cannot provide
-  this project's leaf-area denominator by itself.
+  masks and its Scientific Data paper explicitly states CC BY-NC 4.0. The same
+  paper also explicitly says leaf boundaries are not annotated. PlantSeg is
+  therefore a legally plausible non-commercial academic starting point for
+  lesion masks, but it cannot provide the leaf-area denominator by itself.
+- [PlantVillage Apple Synthetic Segmentation Dataset](https://zenodo.org/records/18659728)
+  supplies 75 apple images with manually drawn disease masks, but the Zenodo
+  record's licence field is blank. It must not be used until the depositor or a
+  rights owner supplies explicit reuse terms.
+- [LDD grape disease instance segmentation](https://zenodo.org/records/10573036)
+  has potentially useful field annotations, but its files are access-restricted
+  and limited to non-commercial use. Access and exact mask semantics would have
+  to be approved before use.
 - [Plant leaves image segmentation dataset](https://zenodo.org/records/14707857)
   contains beet and rye image/mask collections for leaf and disease
   segmentation. Its directory description shows separate task collections,
@@ -42,13 +50,51 @@ non-binary/non-finite masks. This is arithmetic only; it does not infer masks.
   masks. Separate datasets cannot be combined as though their masks annotate
   the same photograph.
 
+## Fastest rights-safe annotation path
+
+1. Use a non-commercial PlantSeg subset only after recording CC BY-NC 4.0,
+   source URL, attribution, archive checksum, and an exact mapping to a
+   Candidate-v2 crop/disease label.
+2. Preserve PlantSeg's lesion mask and annotate the *whole visible leaf* on the
+   same image in local open-source CVAT. Do not trace a different photo or infer
+   a leaf mask from another dataset.
+3. Have a second reviewer inspect every leaf mask and at least 20% of lesion
+   masks. Record disagreements and corrections.
+4. Keep source/near-duplicate groups in one split. Do not use the final test
+   split for model selection or threshold tuning.
+5. For crops/classes not covered with suitable rights, collect project-owned
+   photographs under a written consent/reuse statement and annotate both masks.
+
+`training/segmentation_manifest.example.csv` defines the evidence fields. The
+validator refuses empty rights metadata, anything not marked
+`approved_for_project`, group leakage, mismatched dimensions, non-binary masks,
+lesions outside the leaf, and empty leaf masks.
+
+## Implemented offline evaluation
+
+`training/evaluate_segmentation.py` evaluates paired leaf and lesion prediction
+PNGs against an untouched manifest split and writes machine-readable summary
+and per-sample evidence. Missing or empty leaf predictions are abstentions, not
+zero-area measurements. The current predefined engineering gate is:
+
+- at least 90% test coverage overall and for every reported crop;
+- mean leaf Dice at least 0.95;
+- mean lesion Dice at least 0.75;
+- affected-area mean absolute error at most 5 percentage points; and
+- 95th-percentile affected-area absolute error at most 15 percentage points.
+
+Before approval, the untouched test set must also contain at least 20 images per
+reported crop. The evaluator records per-crop metrics, and results must also be
+inspected per disease. These are
+prototype engineering criteria, not evidence that a percentage predicts yield
+loss or whole-plant severity.
+
 ## Gate before live integration
 
 Acquire or create rights-cleared, same-image leaf and lesion masks for relevant
-supported crop/disease classes. Freeze group-disjoint train/validation/test
-partitions and predefined acceptance thresholds. Record leaf and lesion
-Dice/IoU, absolute affected-area error in percentage points, per-crop results,
-and abstention coverage on untouched field photographs.
+supported crop/disease classes, then train a segmentation candidate and run the
+frozen gate above. The evaluator records leaf and lesion Dice/IoU, absolute
+affected-area error in percentage points, and abstention coverage.
 
 Severity thresholds and health-score semantics need their own documented and
 validated rules. Until those gates pass, `diseaseRate`, `severity`, and

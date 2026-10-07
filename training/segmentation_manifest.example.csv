@@ -1,0 +1,2 @@
+sample_id,image_path,leaf_mask_path,lesion_mask_path,crop,classifier_label,group_id,split,source_url,license_id,rights_status,attribution
+example-001,images/example-001.jpg,masks/leaf/example-001.png,masks/lesion/example-001.png,Apple,Apple___Apple_scab,source-photo-001,test,https://example.invalid/source,OWNER-CONSENT,approved_for_project,Replace with the photographer and source attribution
