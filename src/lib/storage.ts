@@ -15,8 +15,20 @@ export function loadHistory(): AnalysisReport[] {
 
 export function saveReport(report: AnalysisReport): void {
   const current = loadHistory().filter((item) => item.id !== report.id);
-  localStorage.setItem(HISTORY_KEY, JSON.stringify([report, ...current].slice(0, 30)));
   sessionStorage.setItem(ACTIVE_REPORT_KEY, JSON.stringify(report));
+  const history = [report, ...current].slice(0, 30);
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch {
+    // Preserve report details if full-resolution photos exhaust browser storage.
+    // The active report above retains its image for user-assisted marking.
+    try {
+      const compact = history.map((item) => ({ ...item, thumbnailDataUrl: undefined }));
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(compact));
+    } catch {
+      // Browser history is optional; analysis and the current report must still work.
+    }
+  }
 }
 
 export function deleteReport(id: string): void {

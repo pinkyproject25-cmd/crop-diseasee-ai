@@ -252,8 +252,8 @@ function AnalyzePage() {
       const location = includeWeather ? await getLocation() : {};
       const report = await analyzeImage(dataUrlToFile(image), location.latitude, location.longitude);
       report.thumbnailDataUrl = image;
-      saveReport(report);
       clearDraftImage();
+      saveReport(report);
       navigate("/result");
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Analysis failed. Please try again.");
