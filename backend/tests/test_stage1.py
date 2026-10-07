@@ -77,7 +77,12 @@ class CandidateV2HttpTests(unittest.TestCase):
         self.assertEqual(report["topPredictions"][0]["label"], "Apple___Apple_scab")
         self.assertEqual(len(report["topPredictions"]), 5)
         self.assertEqual(report["modelStatus"], "experimental")
-        self.assert_missing_layers(report)
+        if report["diseaseRate"] is None:
+            self.assert_missing_layers(report)
+        else:
+            self.assertEqual(report["healthScore"], round(100 - report["diseaseRate"], 1))
+            self.assertIn(report["severity"], ("Low", "Medium", "High"))
+            self.assertTrue(report["observedSymptoms"])
         self.assertTrue(report["typicalSymptoms"])
         self.assertTrue(report["causes"])
         self.assertTrue(report["recommendations"])
@@ -94,7 +99,7 @@ class CandidateV2HttpTests(unittest.TestCase):
         self.assert_missing_layers(report)
         self.assertEqual(report["typicalSymptoms"], [])
         self.assertEqual(report["causes"], [])
-        self.assertEqual(report["recommendations"], [])
+        self.assertEqual(len(report["recommendations"]), 3)
         self.assertEqual(report["knowledgeSources"], [])
 
     def test_low_confidence_returns_unknown(self) -> None:

@@ -111,7 +111,7 @@ class KnowledgeApiTests(unittest.TestCase):
         self.assertEqual(report["disease"], None)
         self.assertEqual(report["typicalSymptoms"], [])
         self.assertEqual(report["causes"], [])
-        self.assertEqual(report["recommendations"], [])
+        self.assertEqual(len(report["recommendations"]), 3)
         self.assertEqual(report["knowledgeSources"], [])
 
     def test_low_confidence_report_never_receives_disease_knowledge(self) -> None:

@@ -29,6 +29,7 @@ export interface AnalysisReport {
   diseaseRate: number | null;
   severity: Severity;
   healthScore: number | null;
+  measurementSource?: "automatic_experimental" | "user_assisted";
   observedSymptoms: string[];
   typicalSymptoms: string[];
   causes: string[];
